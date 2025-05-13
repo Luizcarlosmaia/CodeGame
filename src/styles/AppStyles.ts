@@ -54,7 +54,7 @@ export const Container = styled.div`
 export const Title = styled.h1`
   font-size: 1.5rem;
   color: ${({ theme }) => theme.colors.primaryDark};
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 `;
 
 export const Subtitle = styled.p`
@@ -136,7 +136,7 @@ export const RestartButton = styled.button`
 export const WinnerMessage = styled.div`
   background-color: ${({ theme }) => theme.colors.successBg};
   color: ${({ theme }) => theme.colors.successText};
-  padding: 1rem;
+  padding: 0.5rem;
   border-radius: 6px;
   font-weight: bold;
   margin-bottom: 1rem;
@@ -205,13 +205,13 @@ export const PageWrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 100vh;
-  padding: 2rem;
+  padding: 0.1rem;
   background-color: ${({ theme }) => theme.colors.background};
 
   @media (max-width: 600px) {
-    padding: 1rem;
+    padding: 0.5rem;
   }
 `;
 
@@ -220,26 +220,24 @@ export const Content = styled.div`
   width: 100%;
   max-width: 360px;
   background-color: ${({ theme }) => theme.colors.white};
-  min-height: calc(100vh - 2rem);
+  min-height: calc(80vh - 2rem);
   overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 1rem;
+  padding: 1rem 2rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
   align-items: center;
 `;
 
-/** Painel de controles: título, contador e modo */
 export const Controls = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 0.1rem;
 `;
 
-/** Linha de inputs + botão */
 export const InputArea = styled.div`
   display: flex;
   align-items: center;
@@ -382,4 +380,81 @@ export const ActionGroup = styled.div`
   display: flex;
   gap: 0.5rem;
   margin-top: 0.5rem;
+`;
+
+// Modal de ajuda
+export const Overlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+`;
+
+export const ModalBox = styled.div`
+  background: ${({ theme }) => theme.colors.white};
+  padding: 1.5rem;
+  max-width: 320px;
+  width: 90%;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  position: relative;
+  color: ${({ theme }) => theme.colors.primaryDark};
+`;
+
+export const ModalHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+`;
+
+export const ModalContent = styled.div`
+  font-size: 0.9rem;
+
+  ul {
+    padding-left: 1.2rem;
+    margin: 0.5rem 0 0;
+  }
+
+  li {
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+  }
+`;
+
+export const CloseButton = styled.button`
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: ${({ theme }) => theme.colors.grayText};
+  padding: 0;
+  line-height: 1;
+`;
+
+export const IconButton = styled.button`
+  background-color: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.numberColor};
+  border: 1px solid ${({ theme }) => theme.colors.inputBorder};
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.white};
+  }
 `;

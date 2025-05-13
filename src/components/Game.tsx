@@ -30,12 +30,28 @@ interface GameProps {
   mode: "easy" | "hard";
 }
 export const Game: React.FC<GameProps> = ({ mode }) => {
-  const [secretCode, setSecretCode] = useState<string[]>(generateCode);
-  const [guesses, setGuesses] = useState<string[][]>([]);
+  const [codes, setCodes] = useState<{ easy: string[]; hard: string[] }>({
+    easy: generateCode(),
+    hard: generateCode(),
+  });
+  const [allGuesses, setAllGuesses] = useState<{
+    easy: string[][];
+    hard: string[][];
+  }>({
+    easy: [],
+    hard: [],
+  });
+  const [hasWon, setHasWon] = useState<{ easy: boolean; hard: boolean }>({
+    easy: false,
+    hard: false,
+  });
   const [inputDigits, setInputDigits] = useState(["", "", "", ""]);
-
-  const [isWinner, setIsWinner] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const keypadKeys = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, "↵", "⌫"];
+
+  const secretCode = codes[mode];
+  const guesses = allGuesses[mode];
+  const isWinner = hasWon[mode];
 
   // Foca o primeiro input ao montar e após reset
   const focusField = (idx = 0) => inputRefs.current[idx]?.focus();
@@ -63,32 +79,39 @@ export const Game: React.FC<GameProps> = ({ mode }) => {
   const handleGuess = () => {
     if (isWinner) return;
     if (inputDigits.some((c) => !c)) return;
-    setGuesses((g) => [...g, [...inputDigits]]);
-    if (inputDigits.join("") === secretCode.join("")) setIsWinner(true);
+
+    setAllGuesses((prev) => ({
+      ...prev,
+      [mode]: [...prev[mode], [...inputDigits]],
+    }));
+
+    if (inputDigits.join("") === secretCode.join("")) {
+      setHasWon((prev) => ({ ...prev, [mode]: true }));
+    }
+
     setInputDigits(["", "", "", ""]);
     focusField();
   };
 
   const handleRestart = () => {
-    setSecretCode(generateCode());
-    setGuesses([]);
-    setIsWinner(false);
+    setCodes((prev) => ({ ...prev, [mode]: generateCode() }));
+    setAllGuesses((prev) => ({ ...prev, [mode]: [] }));
+    setHasWon((prev) => ({ ...prev, [mode]: false }));
     setInputDigits(["", "", "", ""]);
     focusField();
   };
 
   const handleClear = () => {
-    setGuesses([]); // limpa o histórico
-    setInputDigits(["", "", "", ""]); // zera inputs
-    setIsWinner(false); // reseta vitória
-    focusField(); // foca no primeiro campo
+    setAllGuesses((prev) => ({ ...prev, [mode]: [] }));
+    setInputDigits(["", "", "", ""]);
+    setHasWon((prev) => ({ ...prev, [mode]: false }));
+    focusField();
   };
 
   return (
     <>
       <PageWrapper>
         <Content>
-          {/* CONTROLS */}
           <Controls>
             <Title>Code Game</Title>
             <Counter>
@@ -122,20 +145,33 @@ export const Game: React.FC<GameProps> = ({ mode }) => {
             </SubmitButton>
           </InputArea>
           <Keypad>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((n) => (
+            {keypadKeys.map((k, i) => (
               <Key
-                key={n}
+                key={i}
                 onClick={() => {
-                  // encontra primeira posição vazia e insere o dígito
-                  const idx = inputDigits.findIndex((d) => d === "");
-                  if (idx !== -1) handleChange(String(n), idx);
+                  if (typeof k === "number") {
+                    // insere dígito
+                    const idx = inputDigits.findIndex((d) => d === "");
+                    if (idx !== -1) handleChange(String(k), idx);
+                  } else if (k === "⌫") {
+                    // exclui último dígito
+                    const lastFilled = inputDigits
+                      .map((d, i) => (d ? i : -1))
+                      .filter((i) => i >= 0)
+                      .pop();
+                    if (lastFilled !== undefined) {
+                      handleChange("", lastFilled);
+                      focusField(lastFilled);
+                    }
+                  } else {
+                    // enter
+                    handleGuess();
+                  }
                 }}
               >
-                {n}
+                {k}
               </Key>
             ))}
-            {/* enter */}
-            <Key onClick={handleGuess}>↵</Key>
           </Keypad>
 
           <ActionGroup>
