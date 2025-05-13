@@ -2,12 +2,9 @@
 import React, { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import { GuessRow } from "./GuessRow";
 import { generateCode } from "../utils/generateCode";
-import type { GameMode } from "../types";
 import {
   Title,
   Subtitle,
-  ModeToggleGroup,
-  ModeToggleButton,
   DigitInput,
   SubmitButton,
   RestartButton,
@@ -24,14 +21,19 @@ import {
   TableRow,
   TableCell,
   Badge,
+  Keypad,
+  Key,
+  ActionGroup,
 } from "../styles/AppStyles";
 import { getFeedback } from "../utils/getFeedback";
-
-export const Game: React.FC = () => {
+interface GameProps {
+  mode: "easy" | "hard";
+}
+export const Game: React.FC<GameProps> = ({ mode }) => {
   const [secretCode, setSecretCode] = useState<string[]>(generateCode);
   const [guesses, setGuesses] = useState<string[][]>([]);
   const [inputDigits, setInputDigits] = useState(["", "", "", ""]);
-  const [mode, setMode] = useState<GameMode>("easy");
+
   const [isWinner, setIsWinner] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -83,113 +85,117 @@ export const Game: React.FC = () => {
   };
 
   return (
-    <PageWrapper>
-      <Content>
-        {/* CONTROLS */}
-        <Controls>
-          <Title>Jogo do Cadeado</Title>
-          <Counter>
-            Tentativa {isWinner ? guesses.length : guesses.length + 1} de ∞
-          </Counter>
-          <Subtitle>
-            Modo:
-            <ModeToggleGroup>
-              <ModeToggleButton
-                active={mode === "easy"}
-                onClick={() => setMode("easy")}
+    <>
+      <PageWrapper>
+        <Content>
+          {/* CONTROLS */}
+          <Controls>
+            <Title>Code Game</Title>
+            <Counter>
+              Tentativa {isWinner ? guesses.length : guesses.length + 1} de ∞
+            </Counter>
+          </Controls>
+
+          {/* INPUTS + ENVIAR */}
+          <InputArea>
+            {inputDigits.map((digit, idx) => (
+              <DigitInput
+                key={idx}
+                type="text"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleChange(e.target.value, idx)}
+                onKeyDown={(e) => handleKey(e, idx)}
+                ref={(el) => {
+                  if (el) inputRefs.current[idx] = el;
+                }}
+                aria-label={`Dígito ${idx + 1}`}
+                disabled={isWinner}
+                readOnly
+              />
+            ))}
+            <SubmitButton
+              onClick={handleGuess}
+              disabled={inputDigits.some((c) => !c) || isWinner}
+            >
+              Enviar
+            </SubmitButton>
+          </InputArea>
+          <Keypad>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((n) => (
+              <Key
+                key={n}
+                onClick={() => {
+                  // encontra primeira posição vazia e insere o dígito
+                  const idx = inputDigits.findIndex((d) => d === "");
+                  if (idx !== -1) handleChange(String(n), idx);
+                }}
               >
-                Fácil
-              </ModeToggleButton>
-              <ModeToggleButton
-                active={mode === "hard"}
-                onClick={() => setMode("hard")}
-              >
-                Difícil
-              </ModeToggleButton>
-            </ModeToggleGroup>
-          </Subtitle>
-        </Controls>
+                {n}
+              </Key>
+            ))}
+            {/* enter */}
+            <Key onClick={handleGuess}>↵</Key>
+          </Keypad>
 
-        {/* INPUTS + ENVIAR */}
-        <InputArea>
-          {inputDigits.map((digit, idx) => (
-            <DigitInput
-              key={idx}
-              type="text"
-              maxLength={1}
-              value={digit}
-              onChange={(e) => handleChange(e.target.value, idx)}
-              onKeyDown={(e) => handleKey(e, idx)}
-              ref={(el) => {
-                if (el) inputRefs.current[idx] = el;
-              }}
-              aria-label={`Dígito ${idx + 1}`}
-              disabled={isWinner}
-            />
-          ))}
-          <SubmitButton
-            onClick={handleGuess}
-            disabled={inputDigits.some((c) => !c) || isWinner}
-          >
-            Enviar
-          </SubmitButton>
-        </InputArea>
+          <ActionGroup>
+            <RestartButton onClick={handleClear}>Resetar Rodada</RestartButton>
+            <RestartButton onClick={handleRestart}>Novo Jogo</RestartButton>
+          </ActionGroup>
 
-        <RestartButton onClick={handleClear}>Limpar Tentativas</RestartButton>
-        <RestartButton onClick={handleRestart}>Novo Desafio</RestartButton>
+          {/* MENSAGEM DE VITÓRIA */}
+          {isWinner && <WinnerMessage>Parabéns! cadeado aberto!</WinnerMessage>}
 
-        {/* MENSAGEM DE VITÓRIA */}
-        {isWinner && <WinnerMessage>Parabéns! cadeado aberto!</WinnerMessage>}
+          {/* TENTATIVAS no modo EASY (cards coloridos) */}
+          {mode === "easy" &&
+            guesses.map((g, i) => (
+              <GuessRow
+                key={i}
+                guess={g}
+                code={secretCode}
+                mode={mode}
+                attempt={i + 1}
+              />
+            ))}
 
-        {/* TENTATIVAS no modo EASY (cards coloridos) */}
-        {mode === "easy" &&
-          guesses.map((g, i) => (
-            <GuessRow
-              key={i}
-              guess={g}
-              code={secretCode}
-              mode={mode}
-              attempt={i + 1}
-            />
-          ))}
-
-        {/* HISTÓRICO DE TENTATIVAS no modo HARD (tabela) */}
-        {mode === "hard" && guesses.length > 0 && (
-          <>
-            <Subtitle>Histórico de tentativas</Subtitle>
-            <GuessTable>
-              <TableHead>
-                <tr>
-                  <TableHeader>#</TableHeader>
-                  <TableHeader>Palpite</TableHeader>
-                  <TableHeader>Certos</TableHeader>
-                  <TableHeader>Presentes</TableHeader>
-                </tr>
-              </TableHead>
-              <TableBody>
-                {guesses.map((guessArr, idx) => {
-                  const { correctPlace, correctDigit } = getFeedback(
-                    guessArr,
-                    secretCode
-                  );
-                  return (
-                    <TableRow key={idx}>
-                      <TableCell>{idx + 1}</TableCell>
-                      <TableCell>{guessArr.join(" ")}</TableCell>
-                      <TableCell>
-                        <Badge variant="success">{correctPlace}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="warning">{correctDigit}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </GuessTable>
-          </>
-        )}
-      </Content>
-    </PageWrapper>
+          {/* HISTÓRICO DE TENTATIVAS no modo HARD (tabela) */}
+          {mode === "hard" && guesses.length > 0 && (
+            <>
+              <Subtitle>Histórico de tentativas</Subtitle>
+              <GuessTable>
+                <TableHead>
+                  <tr>
+                    <TableHeader>#</TableHeader>
+                    <TableHeader>Palpite</TableHeader>
+                    <TableHeader>Certos</TableHeader>
+                    <TableHeader>Presentes</TableHeader>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {guesses.map((guessArr, idx) => {
+                    const { correctPlace, correctDigit } = getFeedback(
+                      guessArr,
+                      secretCode
+                    );
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell>{idx + 1}</TableCell>
+                        <TableCell>{guessArr.join(" ")}</TableCell>
+                        <TableCell>
+                          <Badge variant="success">{correctPlace}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="warning">{correctDigit}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </GuessTable>
+            </>
+          )}
+        </Content>
+      </PageWrapper>
+    </>
   );
 };

@@ -1,6 +1,41 @@
 // src/styles/AppStyles.ts
 import styled, { keyframes, css } from "styled-components";
 
+// src/styles/AppStyles.ts
+export const Header = styled.header`
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1rem;
+`;
+
+export const ModeMenu = styled.nav`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+export const ThemeToggleWrapper = styled.div`
+  /* sem estilos especiais por enquanto */
+`;
+
+export const ToggleWrapper = styled.div`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+`;
+
+export const ToggleButton = styled.button`
+  background: none;
+  border: 2px solid ${({ theme }) => theme.colors.grayText};
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  color: ${({ theme }) => theme.colors.grayText};
+  cursor: pointer;
+`;
+
 export const Container = styled.div`
   display: flex;
   flex-direction: column;
@@ -9,23 +44,22 @@ export const Container = styled.div`
   height: 100vh;
   text-align: center;
   background-color: ${({ theme }) => theme.colors.white};
-  padding: 2rem;
-  max-width: 500px;
+  padding: 1rem;
+  max-width: 360px;
   margin: 2rem auto;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 `;
 
 export const Title = styled.h1`
-  font-size: 2.5rem;
+  font-size: 1.5rem;
   color: ${({ theme }) => theme.colors.primaryDark};
   margin-bottom: 1rem;
 `;
 
 export const Subtitle = styled.p`
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: ${({ theme }) => theme.colors.primaryDark};
-  margin-bottom: 2rem;
 `;
 
 export const StartButton = styled.button`
@@ -65,10 +99,10 @@ export const InputRow = styled.div<{ shake?: boolean }>`
 `;
 
 export const DigitInput = styled.input`
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2rem;
+  height: 2rem;
   text-align: center;
-  font-size: 1.25rem;
+  font-size: 1rem;
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: 4px;
 `;
@@ -93,7 +127,6 @@ export const RestartButton = styled.button`
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  margin-top: 1rem;
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.dangerDark};
@@ -112,21 +145,28 @@ export const WinnerMessage = styled.div`
 
 export const GuessRowContainer = styled.div`
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: 0.25rem; // reduzido de 0.5rem
+  flex-wrap: wrap;
+  justify-content: center;
 `;
 
-export const GuessDigit = styled.div<{ color: string }>`
-  width: 2.5rem;
-  height: 2.5rem;
+export const GuessDigit = styled.div<{ color: string; textColor?: string }>`
+  width: 1.8rem; // reduzido de 2.5rem
+  height: 1.8rem; // reduzido de 2.5rem
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 1.25rem;
+  font-size: 1rem; // reduzido de 1.25rem
   border-radius: 4px;
   background-color: ${({ color }) => color};
-  color: ${({ theme }) => theme.colors.black};
+  color: ${({ textColor, theme }) => textColor ?? theme.colors.black};
+
+  @media (max-width: 600px) {
+    width: 1.8rem; // mantido compacto no mobile
+    height: 1.8rem;
+    font-size: 0.9rem; // ligeiramente menor no mobile
+  }
 `;
 
 export const HardModeText = styled.p`
@@ -136,7 +176,7 @@ export const HardModeText = styled.p`
 
 // Contador de tentativas
 export const Counter = styled.div`
-  font-size: 1rem;
+  font-size: 0.8rem;
   color: ${({ theme }) => theme.colors.primaryDark};
   margin-bottom: 1rem;
   text-align: center;
@@ -169,20 +209,25 @@ export const PageWrapper = styled.div`
   min-height: 100vh;
   padding: 2rem;
   background-color: ${({ theme }) => theme.colors.background};
+
+  @media (max-width: 600px) {
+    padding: 1rem;
+  }
 `;
 
 /** Container interno limita largura e adiciona sombra */
 export const Content = styled.div`
   width: 100%;
-  max-width: 500px;
+  max-width: 360px;
   background-color: ${({ theme }) => theme.colors.white};
-  min-height: 90vh;
+  min-height: calc(100vh - 2rem);
+  overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 2rem;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.75rem;
   align-items: center;
 `;
 
@@ -198,7 +243,7 @@ export const Controls = styled.div`
 export const InputArea = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
 `;
 
 export const HistoryGrid = styled.div`
@@ -220,21 +265,11 @@ export const InfoRow = styled.div`
   gap: 0.5rem;
 `;
 
-export const Badge = styled.span<{ variant: "success" | "warning" }>`
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  background-color: ${({ variant, theme }) =>
-    variant === "success" ? theme.colors.green : theme.colors.yellow};
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 0.85rem;
-  font-weight: 500;
-`;
-
 export const GuessTable = styled.table`
   width: 100%;
   border-collapse: collapse;
-  margin-top: 1.5rem;
+  font-size: 0.9rem;
+  background-color: ${({ theme }) => theme.colors.white};
 `;
 
 export const TableHead = styled.thead`
@@ -242,25 +277,43 @@ export const TableHead = styled.thead`
 `;
 
 export const TableHeader = styled.th`
-  padding: 0.75rem;
+  padding: 0.4rem 0.6rem;
   color: ${({ theme }) => theme.colors.white};
   text-align: center;
-  font-weight: 500;
+  font-weight: 400;
+  font-size: 0.85rem;
+  border: 1px solid ${({ theme }) => theme.colors.black};
 `;
 
 export const TableBody = styled.tbody``;
 
 export const TableRow = styled.tr`
-  &:nth-child(even) {
+  &:nth-child(odd) {
     background-color: ${({ theme }) => theme.colors.gray};
+  }
+  &:nth-child(even) {
+    background-color: ${({ theme }) => theme.colors.white};
   }
 `;
 
 export const TableCell = styled.td`
-  padding: 0.5rem;
+  padding: 0.3rem 0.5rem;
   text-align: center;
-  color: ${({ theme }) => theme.colors.grayText};
-  border: 1px solid ${({ theme }) => theme.colors.gray};
+  color: ${({ theme }) => theme.colors.black};
+  border: 1px solid ${({ theme }) => theme.colors.black};
+`;
+
+export const Badge = styled.span<{ variant: "success" | "warning" }>`
+  display: inline-block;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  background-color: ${({ variant, theme }) =>
+    variant === "success" ? theme.colors.green : theme.colors.yellow};
+  color: ${({ theme }) => theme.colors.primaryDark};
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 1.2rem;
+  text-align: center;
 `;
 
 // Mode Toggle Components
@@ -271,14 +324,62 @@ export const ModeToggleGroup = styled.div`
 `;
 
 export const ModeToggleButton = styled.button<{ active: boolean }>`
-  padding: 0.5rem 1rem;
-  border: none;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: 4px;
   cursor: pointer;
-  background-color: ${({ active, theme }) =>
-    active ? theme.colors.primary : theme.colors.gray};
-  color: ${({ active, theme }) =>
-    active ? theme.colors.white : theme.colors.grayText};
+  background-color: ${
+    ({ active, theme }) =>
+      active
+        ? theme.colors.white /* active: white background */
+        : theme.colors.background /* inactive: match page background */
+  };
+  color: ${
+    ({ active, theme }) =>
+      active
+        ? theme.colors.primaryDark /* active: dark text */
+        : theme.colors.grayText /* inactive: muted text */
+  };
   font-weight: ${({ active }) => (active ? "600" : "400")};
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+`;
+
+export const Keypad = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 2rem);
+  gap: 0.25rem;
+  margin-top: 1rem;
+
+  @media (max-width: 600px) {
+    grid-template-columns: repeat(4, 2.5rem);
+    gap: 0.25rem;
+  }
+`;
+
+export const Key = styled.button`
+  width: 2rem;
+  height: 2rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  background-color: ${({ theme }) => theme.colors.gray};
+  color: ${({ theme }) => theme.colors.numberColor};
+  cursor: pointer;
+
+  &:active {
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.white};
+  }
+
+  @media (max-width: 600px) {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
+  }
+`;
+export const ActionGroup = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 `;

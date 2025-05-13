@@ -7,6 +7,7 @@ export const theme = {
     black: "#000000",
     primary: "#1e1e2e",
     primaryDark: "#1e1e2e",
+    numberColor: "#1e1e2e",
     danger: "#ad0000",
     dangerDark: "#ad0000",
     successBg: "#d4edda",
@@ -26,6 +27,7 @@ export const darkTheme = {
     black: "#000000",
     primary: "#1e1e2e", // azul mais suave
     primaryDark: "#1e1e2e",
+    numberColor: "#ffffff",
     danger: "#ad0000",
     dangerDark: "#ad0000",
     successBg: "#d4edda", // verde escuro suave
