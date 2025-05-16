@@ -4,19 +4,23 @@ import styled, { keyframes, css } from "styled-components";
 // src/styles/AppStyles.ts
 export const Header = styled.header`
   width: 100%;
-  max-width: 360px;
-  margin: 0 auto 1rem;
+  max-width: 600px;
+  margin: 0 auto 0.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 1rem;
+  padding: 0.1rem 0.6rem;
+  gap: 1rem;
 `;
 
-export const ModeMenu = styled.nav`
+export const NavGroup = styled.div`
   display: flex;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  align-items: center;
+  background: ${({ theme }) => theme.colors.background};
+  padding: 0.25rem 0.25rem;
+  border-radius: 6px;
 `;
-
 export const ThemeToggleWrapper = styled.div`
   /* sem estilos especiais por enquanto */
 `;
@@ -174,7 +178,6 @@ export const HardModeText = styled.p`
   color: ${({ theme }) => theme.colors.primaryDark};
 `;
 
-// Contador de tentativas
 export const Counter = styled.div`
   font-size: 0.8rem;
   color: ${({ theme }) => theme.colors.primaryDark};
@@ -227,7 +230,7 @@ export const Content = styled.div`
   padding: 1rem 2rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
   align-items: center;
 `;
 
@@ -317,40 +320,44 @@ export const Badge = styled.span<{ variant: "success" | "warning" }>`
 // Mode Toggle Components
 export const ModeToggleGroup = styled.div`
   display: flex;
-  gap: 0.5rem;
+  gap: 2.5rem;
   margin-top: 0.5rem;
 `;
 
-export const ModeToggleButton = styled.button<{ active: boolean }>`
-  padding: 0.4rem 0.8rem;
+export const ModeToggleButton = styled.button<{ $active: boolean }>`
+  padding: 0.7rem 0.3rem;
   font-size: 0.9rem;
-  border: 1px solid ${({ theme }) => theme.colors.inputBorder};
-  border-radius: 4px;
+  border: 1px solid
+    ${({ $active, theme }) =>
+      $active ? theme.colors.accent : theme.colors.grayText};
+  border-radius: 6px;
   cursor: pointer;
-  background-color: ${
-    ({ active, theme }) =>
-      active
-        ? theme.colors.white /* active: white background */
-        : theme.colors.background /* inactive: match page background */
-  };
-  color: ${
-    ({ active, theme }) =>
-      active
-        ? theme.colors.primaryDark /* active: dark text */
-        : theme.colors.grayText /* inactive: muted text */
-  };
-  font-weight: ${({ active }) => (active ? "600" : "400")};
+  background-color: ${({ $active, theme }) =>
+    $active ? theme.colors.accent : "transparent"};
+  color: ${({ $active, theme }) =>
+    $active ? theme.colors.white : theme.colors.grayText};
+  font-weight: ${({ $active }) => ($active ? "600" : "400")};
   transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  &:hover {
+    transform: scale(1.05);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    /* Forçar um background uniforme */
+    background-color: ${({ theme }) => theme.colors.gray};
+    color: ${({ theme }) => theme.colors.grayText};
+  }
 `;
 
 export const Keypad = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 2rem);
+  grid-template-columns: repeat(3, 2rem);
   gap: 0.25rem;
-  margin-top: 1rem;
+  margin-top: 0.2rem;
 
   @media (max-width: 600px) {
-    grid-template-columns: repeat(4, 2.5rem);
+    grid-template-columns: repeat(3, 2.5rem);
     gap: 0.25rem;
   }
 `;
@@ -368,6 +375,12 @@ export const Key = styled.button`
   &:active {
     background-color: ${({ theme }) => theme.colors.primary};
     color: ${({ theme }) => theme.colors.white};
+
+    &:disabled {
+      background-color: ${({ theme }) => theme.colors.gray};
+      color: ${({ theme }) => theme.colors.grayText};
+      cursor: not-allowed;
+    }
   }
 
   @media (max-width: 600px) {
@@ -405,18 +418,19 @@ export const ModalBox = styled.div`
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   position: relative;
   color: ${({ theme }) => theme.colors.primaryDark};
+  max-height: 90vh;
+  overflow-y: auto;
+
+  @media (max-width: 400px) {
+    max-width: 280px;
+    padding: 1rem;
+  }
 `;
 
-export const ModalHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-
-  h2 {
-    margin: 0;
-    font-size: 1.25rem;
-  }
+export const ModalHeader = styled.header`
+  position: relative;
+  padding: 1rem 0;
+  text-align: center;
 `;
 
 export const ModalContent = styled.div`
@@ -434,27 +448,41 @@ export const ModalContent = styled.div`
 `;
 
 export const CloseButton = styled.button`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
   background: none;
   border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
+  font-size: 1.25rem;
   color: ${({ theme }) => theme.colors.grayText};
-  padding: 0;
-  line-height: 1;
+  cursor: pointer;
 `;
 
 export const IconButton = styled.button`
   background-color: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.numberColor};
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
-  padding: 0.4rem 0.8rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 1.7rem;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
-
+  color: ${({ theme }) => theme.colors.white};
+  transition: transform 0.1s;
   &:hover {
-    background-color: ${({ theme }) => theme.colors.primary};
-    color: ${({ theme }) => theme.colors.white};
+    transform: scale(1.2);
   }
+`;
+
+export const PlainIconButton = styled(IconButton)`
+  background-color: transparent;
+  border-color: ${({ theme }) => theme.colors.grayText};
+  color: ${({ theme }) => theme.colors.grayText};
+`;
+
+export const ActiveIconButton = styled(IconButton)<{ active?: boolean }>`
+  background-color: ${({ active, theme }) =>
+    active ? theme.colors.accent : "transparent"};
+  border-color: ${({ active, theme }) =>
+    active ? theme.colors.accent : theme.colors.grayText};
+  color: ${({ active, theme }) =>
+    active ? theme.colors.white : theme.colors.grayText};
 `;

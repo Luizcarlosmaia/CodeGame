@@ -1,7 +1,14 @@
 // src/components/Game.tsx
-import React, { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { GuessRow } from "./GuessRow";
 import { generateCode } from "../utils/generateCode";
+import {
+  loadStats,
+  saveStats,
+  type Stats,
+  type Mode,
+  todayKey,
+} from "../utils/stats";
 import {
   Title,
   Subtitle,
@@ -26,165 +33,207 @@ import {
   ActionGroup,
 } from "../styles/AppStyles";
 import { getFeedback } from "../utils/getFeedback";
+import {
+  loadGameState,
+  saveGameState,
+  type SavedMode,
+} from "../utils/gameState";
+import { generateDailyCode } from "../utils/generateDailyCode";
+
 interface GameProps {
-  mode: "easy" | "hard";
+  mode: Mode;
+  onWin: (stats: Stats) => void;
 }
-export const Game: React.FC<GameProps> = ({ mode }) => {
-  const [codes, setCodes] = useState<{ easy: string[]; hard: string[] }>({
-    easy: generateCode(),
-    hard: generateCode(),
-  });
-  const [allGuesses, setAllGuesses] = useState<{
-    easy: string[][];
-    hard: string[][];
-  }>({
-    easy: [],
-    hard: [],
-  });
-  const [hasWon, setHasWon] = useState<{ easy: boolean; hard: boolean }>({
-    easy: false,
-    hard: false,
-  });
-  const [inputDigits, setInputDigits] = useState(["", "", "", ""]);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const keypadKeys = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, "↵", "⌫"];
 
-  const secretCode = codes[mode];
-  const guesses = allGuesses[mode];
-  const isWinner = hasWon[mode];
+export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
+  const savedState: SavedMode = loadGameState(mode);
+  const {
+    code: savedCode,
+    guesses: savedGuesses,
+    hasWon: savedWon,
+  } = savedState;
 
-  // Foca o primeiro input ao montar e após reset
-  const focusField = (idx = 0) => inputRefs.current[idx]?.focus();
+  // 2) Guarda a data atual pra reset diário
+  const todayRef = useRef<string>(todayKey());
+
+  const [secretCodes, setSecretCodes] = useState<Record<Mode, string[]>>({
+    easy:
+      Array.isArray(savedCode) && savedCode.length === 4
+        ? savedCode
+        : generateCode(),
+    hard:
+      Array.isArray(savedCode) && savedCode.length === 4
+        ? savedCode
+        : generateCode(),
+    practice:
+      Array.isArray(savedCode) && savedCode.length === 4
+        ? savedCode
+        : generateCode(),
+  });
+
+  // 4) Histórico de guesses e flag de vitória do storage
+  const [guesses, setGuesses] = useState<string[][]>(() => savedGuesses || []);
+  const [hasWon, setHasWon] = useState<boolean>(() => savedWon || false);
+
   useEffect(() => {
-    focusField();
-  }, []);
+    const seed = todayKey(); // "20250517"
+    const dailyCode = generateDailyCode(seed);
 
+    setSecretCodes({
+      easy: dailyCode, // todo mundo,
+      hard: dailyCode, // em ambos os modos diários,
+      practice: generateCode(), // mas practice continua livre
+    });
+    setGuesses([]); // opcional: zera histórico
+    setHasWon(false);
+  }, [todayKey()]);
+
+  // 6) Inputs + foco
+  const [inputDigits, setInputDigits] = useState(["", "", "", ""]);
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const focusField = (i = 0) => inputRefs.current[i]?.focus();
+  useEffect(focusField, []);
+
+  // 7) Limites por modo
+  const maxTries = mode === "easy" ? 6 : mode === "hard" ? 15 : Infinity;
+  const secretCode = secretCodes[mode];
+  const keypad = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, "⌫"] as const;
+
+  // 8) Persistência: sempre que mudar guesses/hasWon, salva o estado completo
+  useEffect(() => {
+    saveGameState(mode, {
+      code: secretCode,
+      guesses,
+      hasWon,
+      date: todayRef.current,
+    });
+  }, [mode, secretCode, guesses, hasWon]);
+
+  // handleChange de cada dígito
   const handleChange = (val: string, idx: number) => {
     if (!/^[0-9]?$/.test(val)) return;
-    const d = [...inputDigits];
-    d[idx] = val;
-    setInputDigits(d);
+    const next = [...inputDigits];
+    next[idx] = val;
+    setInputDigits(next);
     if (val && idx < 3) focusField(idx + 1);
   };
 
-  const handleKey = (e: KeyboardEvent, idx: number) => {
-    if (e.key === "Backspace" && !inputDigits[idx] && idx > 0) {
-      focusField(idx - 1);
-    }
-    if (e.key === "Enter" && inputDigits.every((c) => c)) {
-      handleGuess();
-    }
-  };
-
+  // onClick do botão Enviar
   const handleGuess = () => {
-    if (isWinner) return;
-    if (inputDigits.some((c) => !c)) return;
+    if (hasWon) return;
+    if (inputDigits.some((d) => !d)) return;
+    if (guesses.length >= maxTries) return;
 
-    setAllGuesses((prev) => ({
-      ...prev,
-      [mode]: [...prev[mode], [...inputDigits]],
-    }));
+    const isCorrect = inputDigits.join("") === secretCode.join("");
+    const nextGuesses = [...guesses, [...inputDigits]];
 
-    if (inputDigits.join("") === secretCode.join("")) {
-      setHasWon((prev) => ({ ...prev, [mode]: true }));
+    setGuesses(nextGuesses);
+    setInputDigits(["", "", "", ""]);
+    focusField();
+
+    if (isCorrect) {
+      setHasWon(true);
+
+      // atualiza stats
+      const old = loadStats(mode);
+      const used = nextGuesses.length;
+      const s: Stats = {
+        date: old.date,
+        totalGames: old.totalGames + 1,
+        totalWins: old.totalWins + 1,
+        currentStreak: old.currentStreak + 1,
+        bestStreak: Math.max(old.bestStreak, old.currentStreak + 1),
+        distribution: { ...old.distribution },
+      };
+      s.distribution[used] = (s.distribution[used] || 0) + 1;
+      saveStats(mode, s);
+
+      // dispara modal no App
+      onWin(s);
     }
-
-    setInputDigits(["", "", "", ""]);
-    focusField();
   };
 
-  const handleRestart = () => {
-    setCodes((prev) => ({ ...prev, [mode]: generateCode() }));
-    setAllGuesses((prev) => ({ ...prev, [mode]: [] }));
-    setHasWon((prev) => ({ ...prev, [mode]: false }));
-    setInputDigits(["", "", "", ""]);
-    focusField();
-  };
-
+  // Limpa histórico & vitória (só practice)
   const handleClear = () => {
-    setAllGuesses((prev) => ({ ...prev, [mode]: [] }));
+    setGuesses([]);
+    setHasWon(false);
     setInputDigits(["", "", "", ""]);
-    setHasWon((prev) => ({ ...prev, [mode]: false }));
     focusField();
+  };
+  const handleRestart = () => {
+    setSecretCodes((p) => ({ ...p, practice: generateCode() }));
+    handleClear();
   };
 
   return (
-    <>
-      <PageWrapper>
-        <Content>
-          <Controls>
-            <Title>Code Game</Title>
-            <Counter>
-              Tentativa {isWinner ? guesses.length : guesses.length + 1} de ∞
-            </Counter>
-          </Controls>
+    <PageWrapper>
+      <Content>
+        <Controls>
+          <Title>Code Game</Title>
+          <Counter>
+            Tentativa {hasWon ? guesses.length : guesses.length + 1} de 6
+          </Counter>
+        </Controls>
 
-          {/* INPUTS + ENVIAR */}
-          <InputArea>
-            {inputDigits.map((digit, idx) => (
-              <DigitInput
-                key={idx}
-                type="text"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleChange(e.target.value, idx)}
-                onKeyDown={(e) => handleKey(e, idx)}
-                ref={(el) => {
-                  if (el) inputRefs.current[idx] = el;
-                }}
-                aria-label={`Dígito ${idx + 1}`}
-                disabled={isWinner}
-                readOnly
-              />
-            ))}
-            <SubmitButton
-              onClick={handleGuess}
-              disabled={inputDigits.some((c) => !c) || isWinner}
+        <InputArea>
+          {inputDigits.map((digit, i) => (
+            <DigitInput
+              key={i}
+              value={digit}
+              onChange={(e) => handleChange(e.target.value, i)}
+              maxLength={1}
+              ref={(el) => {
+                inputRefs.current[i] = el;
+              }}
+              disabled={hasWon}
+            />
+          ))}
+          <SubmitButton
+            onClick={handleGuess}
+            disabled={hasWon || inputDigits.some((d) => !d)}
+          >
+            Enviar
+          </SubmitButton>
+        </InputArea>
+
+        <Keypad>
+          {keypad.map((k, i) => (
+            <Key
+              key={i}
+              disabled={hasWon}
+              onClick={() => {
+                if (hasWon) return;
+                if (k === "⌫") {
+                  const last = inputDigits
+                    .map((d, j) => (d ? j : -1))
+                    .filter((j) => j >= 0)
+                    .pop();
+                  if (last != null) handleChange("", last);
+                } else {
+                  const idx = inputDigits.indexOf("");
+                  if (idx >= 0) handleChange(String(k), idx);
+                }
+              }}
             >
-              Enviar
-            </SubmitButton>
-          </InputArea>
-          <Keypad>
-            {keypadKeys.map((k, i) => (
-              <Key
-                key={i}
-                onClick={() => {
-                  if (typeof k === "number") {
-                    // insere dígito
-                    const idx = inputDigits.findIndex((d) => d === "");
-                    if (idx !== -1) handleChange(String(k), idx);
-                  } else if (k === "⌫") {
-                    // exclui último dígito
-                    const lastFilled = inputDigits
-                      .map((d, i) => (d ? i : -1))
-                      .filter((i) => i >= 0)
-                      .pop();
-                    if (lastFilled !== undefined) {
-                      handleChange("", lastFilled);
-                      focusField(lastFilled);
-                    }
-                  } else {
-                    // enter
-                    handleGuess();
-                  }
-                }}
-              >
-                {k}
-              </Key>
-            ))}
-          </Keypad>
+              {k}
+            </Key>
+          ))}
+        </Keypad>
 
+        {mode === "practice" && (
           <ActionGroup>
             <RestartButton onClick={handleClear}>Resetar Rodada</RestartButton>
             <RestartButton onClick={handleRestart}>Novo Jogo</RestartButton>
           </ActionGroup>
+        )}
 
-          {/* MENSAGEM DE VITÓRIA */}
-          {isWinner && <WinnerMessage>Parabéns! cadeado aberto!</WinnerMessage>}
+        {hasWon && <WinnerMessage>Parabéns! cadeado aberto!</WinnerMessage>}
 
-          {/* TENTATIVAS no modo EASY (cards coloridos) */}
-          {mode === "easy" &&
-            guesses.map((g, i) => (
+        {mode === "easy" &&
+          // sempre 6 tentativas
+          Array.from({ length: 6 }).map((_, i) => {
+            const g = guesses[i];
+            return g ? (
               <GuessRow
                 key={i}
                 guess={g}
@@ -192,46 +241,54 @@ export const Game: React.FC<GameProps> = ({ mode }) => {
                 mode={mode}
                 attempt={i + 1}
               />
-            ))}
+            ) : (
+              // placeholder vazio
+              <GuessRow
+                key={i}
+                guess={["", "", "", ""]}
+                code={secretCode}
+                mode={mode}
+                attempt={i + 1}
+              />
+            );
+          })}
 
-          {/* HISTÓRICO DE TENTATIVAS no modo HARD (tabela) */}
-          {mode === "hard" && guesses.length > 0 && (
-            <>
-              <Subtitle>Histórico de tentativas</Subtitle>
-              <GuessTable>
-                <TableHead>
-                  <tr>
-                    <TableHeader>#</TableHeader>
-                    <TableHeader>Palpite</TableHeader>
-                    <TableHeader>Certos</TableHeader>
-                    <TableHeader>Presentes</TableHeader>
-                  </tr>
-                </TableHead>
-                <TableBody>
-                  {guesses.map((guessArr, idx) => {
-                    const { correctPlace, correctDigit } = getFeedback(
-                      guessArr,
-                      secretCode
-                    );
-                    return (
-                      <TableRow key={idx}>
-                        <TableCell>{idx + 1}</TableCell>
-                        <TableCell>{guessArr.join(" ")}</TableCell>
-                        <TableCell>
-                          <Badge variant="success">{correctPlace}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="warning">{correctDigit}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </GuessTable>
-            </>
-          )}
-        </Content>
-      </PageWrapper>
-    </>
+        {mode === "hard" && guesses.length > 0 && (
+          <>
+            <Subtitle>Histórico de tentativas</Subtitle>
+            <GuessTable>
+              <TableHead>
+                <tr>
+                  <TableHeader>#</TableHeader>
+                  <TableHeader>Palpite</TableHeader>
+                  <TableHeader>Certos</TableHeader>
+                  <TableHeader>Presentes</TableHeader>
+                </tr>
+              </TableHead>
+              <TableBody>
+                {guesses.map((g, i) => {
+                  const { correctPlace, correctDigit } = getFeedback(
+                    g,
+                    secretCode
+                  );
+                  return (
+                    <TableRow key={i}>
+                      <TableCell>{i + 1}</TableCell>
+                      <TableCell>{g.join(" ")}</TableCell>
+                      <TableCell>
+                        <Badge variant="success">{correctPlace}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="warning">{correctDigit}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </GuessTable>
+          </>
+        )}
+      </Content>
+    </PageWrapper>
   );
 };

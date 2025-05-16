@@ -17,6 +17,7 @@ export const theme = {
     green: "#28a745",
     yellow: "#ffc107",
     gray: "#dee2e6",
+    accent: "#153972",
   },
 };
 
@@ -36,6 +37,7 @@ export const darkTheme = {
     grayText: "#c1c1d1", // texto cinza claro
     green: "#81c784",
     yellow: "#ffd54f",
-    gray: "#3e3e53", // fundo de listas e bordas
+    gray: "#3e3e53",
+    accent: "#153972", // fundo de listas e bordas
   },
 };
