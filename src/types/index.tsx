@@ -4,4 +4,4 @@ export interface Feedback {
   correctDigit: number;
 }
 
-export type GameMode = "easy" | "hard";
+export type GameMode = "casual" | "desafio";

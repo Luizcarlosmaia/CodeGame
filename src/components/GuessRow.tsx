@@ -1,33 +1,52 @@
 import React from "react";
 import { getFeedback, getStatuses } from "../utils/getFeedback";
-import type { GameMode } from "../types";
 import {
   GuessRowContainer,
   GuessDigit,
   HardModeText,
 } from "../styles/AppStyles";
+import type { Mode } from "../utils/stats";
 
 interface Props {
   guess: string[];
   code: string[];
-  mode: GameMode;
+  mode: Mode;
   attempt: number;
 }
 
 export const GuessRow: React.FC<Props> = ({ guess, code, mode }) => {
-  const feedback = getFeedback(guess, code);
+  // placeholder: nenhum dígito ainda
+  const isPlaceholder = guess.every((d) => d === "");
 
-  if (mode === "easy") {
+  if (mode === "casual") {
+    if (isPlaceholder) {
+      // Renderiza 4 caixas claras
+      return (
+        <GuessRowContainer>
+          {[0, 1, 2, 3].map((i) => (
+            <GuessDigit
+              key={i}
+              color={"#f0f0f0"} // fundo claro para placeholder
+              textColor={"#999"} // dígito (vazio) em cinza
+            >
+              &nbsp;
+            </GuessDigit>
+          ))}
+        </GuessRowContainer>
+      );
+    }
+
+    // se não for placeholder, renderiza feedback normal
     const statuses = getStatuses(guess, code);
     return (
       <GuessRowContainer>
         {guess.map((digit, idx) => {
-          let color = "#dee2e6"; // cinza
-          if (statuses[idx] === "correct") color = "#28a745"; // verde
-          else if (statuses[idx] === "present") color = "#ffc107"; // amarelo
+          let bg = "#dee2e6";
+          if (statuses[idx] === "correct") bg = "#28a745";
+          else if (statuses[idx] === "present") bg = "#ffc107";
 
           return (
-            <GuessDigit key={idx} color={color}>
+            <GuessDigit key={idx} color={bg}>
               {digit}
             </GuessDigit>
           );
@@ -36,10 +55,12 @@ export const GuessRow: React.FC<Props> = ({ guess, code, mode }) => {
     );
   }
 
+  // modo desafio continua igual
+  const { correctPlace, correctDigit } = getFeedback(guess, code);
   return (
     <HardModeText>
-      {guess.join(" ")} — {feedback.correctPlace} no lugar certo,{" "}
-      {feedback.correctDigit} fora do lugar.
+      {guess.join(" ")} — {correctPlace} no lugar certo, {correctDigit} fora do
+      lugar.
     </HardModeText>
   );
 };

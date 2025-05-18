@@ -33,8 +33,6 @@ export const StatCard = styled.div`
 `;
 
 export const BarChart = styled.div`
-  display: flex;
-  flex-direction: column;
   gap: 0.5rem;
 `;
 

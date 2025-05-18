@@ -1,9 +1,9 @@
-export type Mode = "easy" | "hard" | "practice";
+export type Mode = "casual" | "desafio" | "custom";
 
-function statsKey(mode: "easy" | "hard"): string {
+function statsKey(mode: "casual" | "desafio"): string {
   return `codeGameStats-${mode}`;
 }
-function seenKey(mode: "easy" | "hard", dateKey: string): string {
+function seenKey(mode: "casual" | "desafio", dateKey: string): string {
   return `seenStats-${mode}-${dateKey}`;
 }
 
@@ -35,7 +35,7 @@ const defaultStats = (): Stats => ({
 });
 
 export function loadStats(mode: Mode): Stats {
-  if (mode === "practice") {
+  if (mode === "custom") {
     return defaultStats();
   }
   try {
@@ -50,18 +50,18 @@ export function loadStats(mode: Mode): Stats {
 }
 
 export function saveStats(mode: Mode, stats: Stats) {
-  if (mode === "practice") {
+  if (mode === "custom") {
     return defaultStats();
   }
   localStorage.setItem(statsKey(mode), JSON.stringify(stats));
 }
 
 export function hasSeenStats(mode: Mode, dateKey: string): boolean {
-  if (mode === "practice") return false;
+  if (mode === "custom") return false;
   return localStorage.getItem(seenKey(mode, dateKey)) === "1";
 }
 
 export function markStatsSeen(mode: Mode, dateKey: string): void {
-  if (mode === "practice") return;
+  if (mode === "custom") return;
   localStorage.setItem(seenKey(mode, dateKey), "1");
 }

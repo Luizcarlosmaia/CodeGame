@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { GuessRow } from "./GuessRow";
 import { generateCode } from "../utils/generateCode";
+import { generateDailyCode } from "../utils/generateDailyCode";
 import {
   loadStats,
   saveStats,
@@ -38,7 +39,6 @@ import {
   saveGameState,
   type SavedMode,
 } from "../utils/gameState";
-import { generateDailyCode } from "../utils/generateDailyCode";
 
 interface GameProps {
   mode: Mode;
@@ -46,99 +46,93 @@ interface GameProps {
 }
 
 export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
-  const savedState: SavedMode = loadGameState(mode);
-  const {
-    code: savedCode,
-    guesses: savedGuesses,
-    hasWon: savedWon,
-  } = savedState;
+  const today = todayKey();
 
-  // 2) Guarda a data atual pra reset diário
-  const todayRef = useRef<string>(todayKey());
+  // geramos duas seeds diárias distintas
+  const dailyCasual = generateDailyCode(`${today}-casual`);
+  const dailyDesafio = generateDailyCode(`${today}-desafio`);
 
-  const [secretCodes, setSecretCodes] = useState<Record<Mode, string[]>>({
-    easy:
-      Array.isArray(savedCode) && savedCode.length === 4
-        ? savedCode
-        : generateCode(),
-    hard:
-      Array.isArray(savedCode) && savedCode.length === 4
-        ? savedCode
-        : generateCode(),
-    practice:
-      Array.isArray(savedCode) && savedCode.length === 4
-        ? savedCode
-        : generateCode(),
+  // 1) inicializa estado carregando do localStorage (ou cria fallback)
+  const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() => {
+    const fallback: Record<Mode, SavedMode> = {
+      casual: { code: dailyCasual, guesses: [], hasWon: false, date: today },
+      desafio: { code: dailyDesafio, guesses: [], hasWon: false, date: today },
+      custom: {
+        code: generateCode(),
+        guesses: [],
+        hasWon: false,
+        date: today,
+      },
+    };
+    return (["casual", "desafio", "custom"] as Mode[]).reduce((acc, m) => {
+      const saved = loadGameState(m);
+      const isToday = saved.date === today;
+      acc[m] = {
+        code:
+          Array.isArray(saved.code) && saved.code.length === 4 && isToday
+            ? saved.code
+            : fallback[m].code,
+        guesses: isToday ? saved.guesses : [],
+        hasWon: isToday ? saved.hasWon : false,
+        date: today,
+      };
+      return acc;
+    }, {} as Record<Mode, SavedMode>);
   });
 
-  // 4) Histórico de guesses e flag de vitória do storage
-  const [guesses, setGuesses] = useState<string[][]>(() => savedGuesses || []);
-  const [hasWon, setHasWon] = useState<boolean>(() => savedWon || false);
-
+  // 2) salva no storage sempre que mudar o modo ativo ou seu estado
   useEffect(() => {
-    const seed = todayKey(); // "20250517"
-    const dailyCode = generateDailyCode(seed);
+    saveGameState(mode, gameState[mode]);
+  }, [mode, gameState]);
 
-    setSecretCodes({
-      easy: dailyCode, // todo mundo,
-      hard: dailyCode, // em ambos os modos diários,
-      practice: generateCode(), // mas practice continua livre
-    });
-    setGuesses([]); // opcional: zera histórico
-    setHasWon(false);
-  }, [todayKey()]);
-
-  // 6) Inputs + foco
-  const [inputDigits, setInputDigits] = useState(["", "", "", ""]);
-  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  // 3) controle de inputs
+  const [inputDigits, setInputDigits] = useState<string[]>(["", "", "", ""]);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const focusField = (i = 0) => inputRefs.current[i]?.focus();
   useEffect(focusField, []);
 
-  // 7) Limites por modo
-  const maxTries = mode === "easy" ? 6 : mode === "hard" ? 15 : Infinity;
-  const secretCode = secretCodes[mode];
-  const keypad = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, "⌫"] as const;
+  // 4) extrai do estado atual
+  const { code: secretCode, guesses, hasWon } = gameState[mode]!;
 
-  // 8) Persistência: sempre que mudar guesses/hasWon, salva o estado completo
-  useEffect(() => {
-    saveGameState(mode, {
-      code: secretCode,
-      guesses,
-      hasWon,
-      date: todayRef.current,
-    });
-  }, [mode, secretCode, guesses, hasWon]);
+  // 5) limites e flags
+  const maxTries = mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity;
+  const isLost = !hasWon && guesses.length >= maxTries;
 
-  // handleChange de cada dígito
   const handleChange = (val: string, idx: number) => {
-    if (!/^[0-9]?$/.test(val)) return;
+    if (!/^[0-9]?$/.test(val) || hasWon || isLost) return;
     const next = [...inputDigits];
     next[idx] = val;
     setInputDigits(next);
     if (val && idx < 3) focusField(idx + 1);
   };
 
-  // onClick do botão Enviar
   const handleGuess = () => {
-    if (hasWon) return;
+    if (hasWon || isLost) return;
     if (inputDigits.some((d) => !d)) return;
     if (guesses.length >= maxTries) return;
 
     const isCorrect = inputDigits.join("") === secretCode.join("");
     const nextGuesses = [...guesses, [...inputDigits]];
 
-    setGuesses(nextGuesses);
+    setGameState((prev) => ({
+      ...prev,
+      [mode]: {
+        ...prev[mode]!,
+        guesses: nextGuesses,
+        hasWon: prev[mode]!.hasWon || isCorrect,
+        date: today,
+      },
+    }));
+
     setInputDigits(["", "", "", ""]);
     focusField();
 
     if (isCorrect) {
-      setHasWon(true);
-
-      // atualiza stats
+      // ——————— Vitória ———————
       const old = loadStats(mode);
       const used = nextGuesses.length;
       const s: Stats = {
-        date: old.date,
+        ...old,
         totalGames: old.totalGames + 1,
         totalWins: old.totalWins + 1,
         currentStreak: old.currentStreak + 1,
@@ -147,31 +141,62 @@ export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
       };
       s.distribution[used] = (s.distribution[used] || 0) + 1;
       saveStats(mode, s);
-
-      // dispara modal no App
+      onWin(s);
+    } else if (nextGuesses.length === maxTries) {
+      // ——————— Derrota no último palpite ———————
+      const old = loadStats(mode);
+      const s: Stats = {
+        ...old,
+        totalGames: old.totalGames + 1,
+        // totalWins não aumenta
+        currentStreak: 0,
+        bestStreak: old.bestStreak,
+        distribution: { ...old.distribution },
+      };
+      // opcional: contabilizar derrotas em distribution[0]:
+      // s.distribution[0] = (s.distribution[0] || 0) + 1;
+      saveStats(mode, s);
+      // para disparar o modal de estatísticas (mesmo na derrota)
       onWin(s);
     }
   };
 
-  // Limpa histórico & vitória (só practice)
   const handleClear = () => {
-    setGuesses([]);
-    setHasWon(false);
+    setGameState((prev) => ({
+      ...prev,
+      custom: {
+        ...prev.custom!,
+        guesses: [],
+        hasWon: false,
+        date: today,
+      },
+    }));
     setInputDigits(["", "", "", ""]);
     focusField();
   };
   const handleRestart = () => {
-    setSecretCodes((p) => ({ ...p, practice: generateCode() }));
+    setGameState((prev) => ({
+      ...prev,
+      custom: {
+        ...prev.custom!,
+        code: generateCode(),
+        date: today,
+      },
+    }));
     handleClear();
   };
 
+  const keypad = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, "⌫"] as const;
+
+  // 8) render
   return (
     <PageWrapper>
       <Content>
         <Controls>
           <Title>Code Game</Title>
           <Counter>
-            Tentativa {hasWon ? guesses.length : guesses.length + 1} de 6
+            Tentativa {hasWon || isLost ? maxTries : guesses.length + 1} de{" "}
+            {mode === "casual" ? 6 : mode === "desafio" ? 15 : "∞"}
           </Counter>
         </Controls>
 
@@ -185,12 +210,19 @@ export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
               ref={(el) => {
                 inputRefs.current[i] = el;
               }}
-              disabled={hasWon}
+              disabled={hasWon || isLost}
+              readOnly
+              inputMode="none"
             />
           ))}
           <SubmitButton
             onClick={handleGuess}
-            disabled={hasWon || inputDigits.some((d) => !d)}
+            disabled={
+              hasWon ||
+              isLost ||
+              inputDigits.some((d) => !d) ||
+              guesses.length >= maxTries
+            }
           >
             Enviar
           </SubmitButton>
@@ -200,9 +232,9 @@ export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
           {keypad.map((k, i) => (
             <Key
               key={i}
-              disabled={hasWon}
+              disabled={hasWon || isLost}
               onClick={() => {
-                if (hasWon) return;
+                if (hasWon || isLost) return;
                 if (k === "⌫") {
                   const last = inputDigits
                     .map((d, j) => (d ? j : -1))
@@ -220,20 +252,28 @@ export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
           ))}
         </Keypad>
 
-        {mode === "practice" && (
+        {mode === "custom" && (
           <ActionGroup>
             <RestartButton onClick={handleClear}>Resetar Rodada</RestartButton>
             <RestartButton onClick={handleRestart}>Novo Jogo</RestartButton>
           </ActionGroup>
         )}
 
-        {hasWon && <WinnerMessage>Parabéns! cadeado aberto!</WinnerMessage>}
+        {hasWon && <WinnerMessage>🎉 Parabéns! cadeado aberto!</WinnerMessage>}
 
-        {mode === "easy" &&
-          // sempre 6 tentativas
+        {isLost && !hasWon && (
+          <WinnerMessage
+            as="div"
+            style={{ background: "#f8d7da", color: "#721c24" }}
+          >
+            😞 Você perdeu. O código era {secretCode.join("")}.
+          </WinnerMessage>
+        )}
+        {/* EASY: placeholders fixos */}
+        {mode === "casual" &&
           Array.from({ length: 6 }).map((_, i) => {
-            const g = guesses[i];
-            return g ? (
+            const g = guesses[i] ?? ["", "", "", ""];
+            return (
               <GuessRow
                 key={i}
                 guess={g}
@@ -241,19 +281,11 @@ export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
                 mode={mode}
                 attempt={i + 1}
               />
-            ) : (
-              // placeholder vazio
-              <GuessRow
-                key={i}
-                guess={["", "", "", ""]}
-                code={secretCode}
-                mode={mode}
-                attempt={i + 1}
-              />
             );
           })}
 
-        {mode === "hard" && guesses.length > 0 && (
+        {/* HARD: histórico padrão */}
+        {mode === "desafio" && guesses.length > 0 && (
           <>
             <Subtitle>Histórico de tentativas</Subtitle>
             <GuessTable>
