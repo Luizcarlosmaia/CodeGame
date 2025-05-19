@@ -1,0 +1,21 @@
+{
+  "name": "Code Game",
+  "short_name": "CodeGame",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a202c",
+  "description": "Jogo de código secreto",
+  "icons": [
+    {
+      "src": "/iconeCodeName.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/iconeCodeName.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

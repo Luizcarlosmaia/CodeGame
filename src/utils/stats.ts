@@ -42,8 +42,14 @@ export function loadStats(mode: Mode): Stats {
     const raw = localStorage.getItem(statsKey(mode));
     if (!raw) return defaultStats();
     const stored: Stats = JSON.parse(raw);
-    // reset diário:
-    return stored.date === todayKey() ? stored : defaultStats();
+    if (stored.date === todayKey()) {
+      return stored;
+    } else {
+      return {
+        ...stored,
+        date: todayKey(),
+      };
+    }
   } catch {
     return defaultStats();
   }

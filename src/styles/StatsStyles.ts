@@ -8,27 +8,42 @@ export const StatGrid = styled.div`
   gap: 1rem;
   margin-bottom: 1.5rem;
   place-items: center;
+  width: 100%;
+  justify-items: center;
+  align-items: center;
 `;
 
 export const StatCard = styled.div`
   background: ${({ theme }) => theme.colors.gray};
-  width: 6rem;
+  width: 100%;
+  max-width: 8rem;
+  min-width: 6rem;
   height: 4rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 7px;
+  text-align: center;
   .label {
     color: ${({ theme }) => theme.colors.grayText};
+    padding: 0.3rem;
     font-size: 0.7rem;
-    margin-bottom: 0.25rem;
+    margin: 0.25rem;
+    width: 100%;
+    text-align: center;
+    word-break: break-word;
+    white-space: normal;
   }
   .value {
     font-size: 1.2rem;
     font-weight: bold;
     color: ${({ theme }) => theme.colors.numberColor};
     margin-bottom: 1rem;
+    width: 100%;
+    text-align: center;
+    word-break: break-word;
+    white-space: normal;
   }
 `;
 

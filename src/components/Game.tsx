@@ -43,9 +43,11 @@ import {
 interface GameProps {
   mode: Mode;
   onWin: (stats: Stats) => void;
+  /** Somente para testes automatizados: força o código secreto */
+  __testCode?: string[];
 }
 
-export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
+export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
   const today = todayKey();
 
   // geramos duas seeds diárias distintas
@@ -55,10 +57,20 @@ export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
   // 1) inicializa estado carregando do localStorage (ou cria fallback)
   const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() => {
     const fallback: Record<Mode, SavedMode> = {
-      casual: { code: dailyCasual, guesses: [], hasWon: false, date: today },
-      desafio: { code: dailyDesafio, guesses: [], hasWon: false, date: today },
+      casual: {
+        code: __testCode || dailyCasual,
+        guesses: [],
+        hasWon: false,
+        date: today,
+      },
+      desafio: {
+        code: __testCode || dailyDesafio,
+        guesses: [],
+        hasWon: false,
+        date: today,
+      },
       custom: {
-        code: generateCode(),
+        code: __testCode || generateCode(),
         guesses: [],
         hasWon: false,
         date: today,
@@ -130,7 +142,8 @@ export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
     if (isCorrect) {
       // ——————— Vitória ———————
       const old = loadStats(mode);
-      const used = nextGuesses.length;
+      // Conta apenas tentativas reais até a vitória
+      const used = guesses.length + 1; // guesses ainda não inclui o palpite correto
       const s: Stats = {
         ...old,
         totalGames: old.totalGames + 1,
@@ -195,7 +208,7 @@ export const Game: React.FC<GameProps> = ({ mode, onWin }) => {
         <Controls>
           <Title>Code Game</Title>
           <Counter>
-            Tentativa {hasWon || isLost ? maxTries : guesses.length + 1} de{" "}
+            Tentativa {hasWon ? guesses.length : guesses.length + 1} de{" "}
             {mode === "casual" ? 6 : mode === "desafio" ? 15 : "∞"}
           </Counter>
         </Controls>

@@ -27,8 +27,13 @@ export const StatsModal: React.FC<Props> = ({ stats, maxTries, onClose }) => {
   const winRate =
     totalGames > 0 ? Math.round((stats.totalWins / totalGames) * 100) : 0;
 
-  // Pegar apenas de 1 até maxTries
-  const entries = Array.from({ length: maxTries }, (_, i) => {
+  // Pegar apenas tentativas que realmente ocorreram (não mostrar barras "vazias" após a maior tentativa já usada)
+  const maxTentativasUsadas = Math.max(
+    ...Object.keys(stats.distribution).map((k) => Number(k)),
+    0
+  );
+  const limite = Math.max(maxTentativasUsadas, 1, Math.min(maxTries, 6));
+  const entries = Array.from({ length: limite }, (_, i) => {
     const tries = i + 1;
     const count = stats.distribution[tries] || 0;
     const pct = totalGames ? (count / totalGames) * 100 : 0;
@@ -46,21 +51,27 @@ export const StatsModal: React.FC<Props> = ({ stats, maxTries, onClose }) => {
           <CloseButton onClick={onClose}>×</CloseButton>
         </ModalHeader>
 
-        <StatGrid>
-          <StatCard>
+        <StatGrid
+          style={{
+            width: "100%",
+            justifyItems: "center",
+            alignItems: "center",
+          }}
+        >
+          <StatCard style={{ textAlign: "center", width: "100%" }}>
             <span className="label">Jogos</span>
             <span className="value">{totalGames}</span>
           </StatCard>
-          <StatCard>
+          <StatCard style={{ textAlign: "center", width: "100%" }}>
             <span className="label">Vitórias</span>
             <span className="value">{winRate}%</span>
           </StatCard>
-          <StatCard>
-            <span className="label">Streak</span>
+          <StatCard style={{ textAlign: "center", width: "100%" }}>
+            <span className="label">Sequência de Vitórias</span>
             <span className="value">{stats.currentStreak}</span>
           </StatCard>
-          <StatCard>
-            <span className="label">Melhor streak</span>
+          <StatCard style={{ textAlign: "center", width: "100%" }}>
+            <span className="label">Recorde de Sequência</span>
             <span className="value">{stats.bestStreak}</span>
           </StatCard>
         </StatGrid>

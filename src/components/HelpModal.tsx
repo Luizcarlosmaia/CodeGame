@@ -10,11 +10,16 @@ import {
 
 interface HelpModalProps {
   onClose: () => void;
+  appVersion?: string;
 }
 
-export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+export const HelpModal: React.FC<HelpModalProps> = ({
+  onClose,
+  appVersion,
+}) => {
+  const version = appVersion ?? import.meta.env.VITE_APP_VERSION;
   return (
-    <Overlay onClick={onClose}>
+    <Overlay data-testid="modal-overlay" onClick={onClose}>
       <ModalBox onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
           <h2>Como jogar</h2>
@@ -27,20 +32,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
           <ul>
             <li>Use o teclado na tela para inserir cada dígito (0–9).</li>
             <li>⌫ apaga o último dígito.</li>
-            <li>↵ envia o palpite.</li>
           </ul>
-
-          <h3>Ações (modo Treino)</h3>
-          <ul>
-            <li>
-              <strong>Limpar Rodada</strong> – limpa todos os palpites.
-            </li>
-            <li>
-              <strong>Novo Jogo</strong> – gera um novo código e zera o
-              histórico.
-            </li>
-          </ul>
-
           <h3>Modos de Jogo</h3>
           <ul>
             <li>
@@ -56,6 +48,22 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
               botão “Limpar / Novo Jogo”.
             </li>
           </ul>
+          <h3>Ações (modo Custom)</h3>
+          <ul>
+            <li>
+              <strong>Limpar Rodada</strong> – limpa todos os palpites.
+            </li>
+            <li>
+              <strong>Novo Jogo</strong> – gera um novo código e zera o
+              histórico.
+            </li>
+          </ul>
+          <hr style={{ margin: "1.5em 0" }} />
+          <div
+            style={{ textAlign: "center", fontSize: "0.95em", color: "#888" }}
+          >
+            <strong>Versão:</strong> {version}
+          </div>
         </ModalContent>
       </ModalBox>
     </Overlay>
