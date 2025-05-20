@@ -92,6 +92,22 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
     }, {} as Record<Mode, SavedMode>);
   });
 
+  // Animação de vitória/derrota
+  const [animateRow, setAnimateRow] = useState<null | {
+    idx: number;
+    type: "win" | "lose";
+  }>(null);
+  // Exibe modal automaticamente se já ganhou ou perdeu ao recarregar
+  const [, setShowModal] = useState(() => {
+    // Se já ganhou ou perdeu, mostra o modal imediatamente
+    return (
+      gameState[mode]?.hasWon ||
+      (!gameState[mode]?.hasWon &&
+        gameState[mode]?.guesses.length >=
+          (mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity))
+    );
+  });
+
   // 2) salva no storage sempre que mudar o modo ativo ou seu estado
   useEffect(() => {
     saveGameState(mode, gameState[mode]);
@@ -139,38 +155,52 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
     setInputDigits(["", "", "", ""]);
     focusField();
 
+    // Tempo de animação + atraso extra para o modal
+    const ANIMATION_DURATION = 700;
+    const MODAL_DELAY = 1000; // extra
+
     if (isCorrect) {
       // ——————— Vitória ———————
-      const old = loadStats(mode);
-      // Conta apenas tentativas reais até a vitória
-      const used = guesses.length + 1; // guesses ainda não inclui o palpite correto
-      const s: Stats = {
-        ...old,
-        totalGames: old.totalGames + 1,
-        totalWins: old.totalWins + 1,
-        currentStreak: old.currentStreak + 1,
-        bestStreak: Math.max(old.bestStreak, old.currentStreak + 1),
-        distribution: { ...old.distribution },
-      };
-      s.distribution[used] = (s.distribution[used] || 0) + 1;
-      saveStats(mode, s);
-      onWin(s);
+      setAnimateRow({ idx: guesses.length, type: "win" });
+      setTimeout(() => {
+        setAnimateRow(null);
+        setTimeout(() => {
+          setShowModal(true);
+        }, MODAL_DELAY);
+        const old = loadStats(mode);
+        const used = guesses.length + 1;
+        const s: Stats = {
+          ...old,
+          totalGames: old.totalGames + 1,
+          totalWins: old.totalWins + 1,
+          currentStreak: old.currentStreak + 1,
+          bestStreak: Math.max(old.bestStreak, old.currentStreak + 1),
+          distribution: { ...old.distribution },
+        };
+        s.distribution[used] = (s.distribution[used] || 0) + 1;
+        saveStats(mode, s);
+        onWin(s);
+      }, ANIMATION_DURATION);
     } else if (nextGuesses.length === maxTries) {
       // ——————— Derrota no último palpite ———————
-      const old = loadStats(mode);
-      const s: Stats = {
-        ...old,
-        totalGames: old.totalGames + 1,
-        // totalWins não aumenta
-        currentStreak: 0,
-        bestStreak: old.bestStreak,
-        distribution: { ...old.distribution },
-      };
-      // opcional: contabilizar derrotas em distribution[0]:
-      // s.distribution[0] = (s.distribution[0] || 0) + 1;
-      saveStats(mode, s);
-      // para disparar o modal de estatísticas (mesmo na derrota)
-      onWin(s);
+      setAnimateRow({ idx: guesses.length, type: "lose" });
+      setTimeout(() => {
+        setAnimateRow(null);
+        setTimeout(() => {
+          setShowModal(true);
+        }, MODAL_DELAY);
+        const old = loadStats(mode);
+        const s: Stats = {
+          ...old,
+          totalGames: old.totalGames + 1,
+          // totalWins não aumenta
+          currentStreak: 0,
+          bestStreak: old.bestStreak,
+          distribution: { ...old.distribution },
+        };
+        saveStats(mode, s);
+        onWin(s);
+      }, ANIMATION_DURATION);
     }
   };
 
@@ -272,16 +302,6 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
           </ActionGroup>
         )}
 
-        {hasWon && <WinnerMessage>🎉 Parabéns! cadeado aberto!</WinnerMessage>}
-
-        {isLost && !hasWon && (
-          <WinnerMessage
-            as="div"
-            style={{ background: "#f8d7da", color: "#721c24" }}
-          >
-            😞 Você perdeu. O código era {secretCode.join("")}.
-          </WinnerMessage>
-        )}
         {/* EASY: placeholders fixos */}
         {mode === "casual" &&
           Array.from({ length: 6 }).map((_, i) => {
@@ -293,11 +313,20 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
                 code={secretCode}
                 mode={mode}
                 attempt={i + 1}
+                animate={animateRow?.idx === i}
+                animationType={animateRow?.type}
               />
             );
           })}
-
-        {/* HARD: histórico padrão */}
+        {hasWon && <WinnerMessage>🎉 Parabéns! cadeado aberto!</WinnerMessage>}
+        {isLost && !hasWon && (
+          <WinnerMessage
+            as="div"
+            style={{ background: "#f8d7da", color: "#721c24" }}
+          >
+            😞 Você perdeu. O código era {secretCode.join("")}.
+          </WinnerMessage>
+        )}
         {mode === "desafio" && guesses.length > 0 && (
           <>
             <Subtitle>Histórico de tentativas</Subtitle>

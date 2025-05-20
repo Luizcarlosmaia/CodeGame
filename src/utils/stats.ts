@@ -42,17 +42,43 @@ export function loadStats(mode: Mode): Stats {
     const raw = localStorage.getItem(statsKey(mode));
     if (!raw) return defaultStats();
     const stored: Stats = JSON.parse(raw);
-    if (stored.date === todayKey()) {
+    const today = todayKey();
+    if (stored.date === today) {
       return stored;
     } else {
+      // Verifica se pulou algum dia
+      // Se a diferença de dias for maior que 1, zera a streak
+      // Como só temos a data do último jogo, basta ver se não é ontem
+      const lastDate = stored.date;
+      const last = parseYYYYMMDD(lastDate);
+      const now = parseYYYYMMDD(today);
+      const diff = daysBetween(last, now);
       return {
         ...stored,
-        date: todayKey(),
+        date: today,
+        currentStreak: diff === 1 ? stored.currentStreak : 0,
       };
     }
   } catch {
     return defaultStats();
   }
+}
+
+// Utilitário para converter YYYYMMDD em Date
+function parseYYYYMMDD(s: string): Date {
+  const y = Number(s.slice(0, 4));
+  const m = Number(s.slice(4, 6)) - 1;
+  const d = Number(s.slice(6, 8));
+  return new Date(y, m, d);
+}
+
+// Retorna diferença em dias entre duas datas (date2 - date1)
+function daysBetween(date1: Date, date2: Date): number {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  // Zera hora/min/seg para evitar problemas de fuso
+  const utc1 = Date.UTC(date1.getFullYear(), date1.getMonth(), date1.getDate());
+  const utc2 = Date.UTC(date2.getFullYear(), date2.getMonth(), date2.getDate());
+  return Math.round((utc2 - utc1) / msPerDay);
 }
 
 export function saveStats(mode: Mode, stats: Stats) {

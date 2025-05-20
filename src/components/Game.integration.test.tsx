@@ -2,6 +2,8 @@ import { renderWithTheme } from "../test-utils";
 import { screen, fireEvent } from "@testing-library/react";
 import { Game } from "./Game";
 import { type Stats } from "../utils/stats";
+import * as statsUtils from "../utils/stats";
+import { vi } from "vitest";
 
 // Utilitário para simular input de dígitos
 function inputGuess(digits: string[]) {
@@ -15,6 +17,53 @@ function inputGuess(digits: string[]) {
 describe("Game integração - vitória e derrota", () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+  it("soma totalGames corretamente ao jogar em dias diferentes (vitória e derrota)", () => {
+    const code = ["1", "2", "3", "4"];
+    let statsResult: Stats | null = null;
+
+    // Mock para o primeiro dia
+    const dia1 = "20240519";
+    const dia2 = "20240520";
+    const spy = vi.spyOn(statsUtils, "todayKey");
+    spy.mockImplementation(() => dia1);
+
+    // Joga e vence no dia 1
+    const { unmount } = renderWithTheme(
+      <Game
+        mode="casual"
+        onWin={(s) => {
+          statsResult = s;
+        }}
+        __testCode={code}
+      />
+    );
+    inputGuess(["1", "2", "3", "4"]);
+    expect(statsResult).not.toBeNull();
+    const totalAfterDay1 = statsResult!.totalGames;
+    unmount();
+
+    // Mock para o segundo dia
+    spy.mockImplementation(() => dia2);
+    statsResult = null;
+    const { unmount: unmount2 } = renderWithTheme(
+      <Game
+        mode="casual"
+        onWin={(s) => {
+          statsResult = s;
+        }}
+        __testCode={code}
+      />
+    );
+    // Derrota no dia 2
+    for (let i = 0; i < 6; i++) {
+      inputGuess(["9", "9", "9", "9"]);
+    }
+    expect(statsResult).not.toBeNull();
+    const totalAfterDay2 = statsResult!.totalGames;
+    expect(totalAfterDay2).toBe(totalAfterDay1 + 1);
+    unmount2();
+    spy.mockRestore();
   });
 
   it("exibe mensagem de vitória, atualiza stats e bloqueia input após ganhar", () => {

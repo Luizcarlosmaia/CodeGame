@@ -12,9 +12,17 @@ interface Props {
   code: string[];
   mode: Mode;
   attempt: number;
+  animate?: boolean;
+  animationType?: "win" | "lose";
 }
 
-export const GuessRow: React.FC<Props> = ({ guess, code, mode }) => {
+export const GuessRow: React.FC<Props> = ({
+  guess,
+  code,
+  mode,
+  animate,
+  animationType,
+}) => {
   // placeholder: nenhum dígito ainda
   const isPlaceholder = guess.every((d) => d === "");
 
@@ -46,7 +54,12 @@ export const GuessRow: React.FC<Props> = ({ guess, code, mode }) => {
           else if (statuses[idx] === "present") bg = "#ffc107";
 
           return (
-            <GuessDigit key={idx} color={bg}>
+            <GuessDigit
+              key={idx}
+              color={bg}
+              $animate={animate}
+              $animationType={animationType}
+            >
               {digit}
             </GuessDigit>
           );

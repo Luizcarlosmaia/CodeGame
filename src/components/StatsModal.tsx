@@ -1,5 +1,5 @@
 // src/components/StatsModal.tsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Overlay,
   ModalBox,
@@ -22,7 +22,27 @@ interface Props {
   onClose: () => void;
 }
 
+// Utilitário para calcular o tempo restante até o próximo reset (meia-noite local)
+function getTimeToNextReset() {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setHours(24, 0, 0, 0); // próxima meia-noite
+  const diff = tomorrow.getTime() - now.getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  return { hours, minutes, seconds };
+}
+
 export const StatsModal: React.FC<Props> = ({ stats, maxTries, onClose }) => {
+  // Cronômetro para o próximo reset diário
+  const [timer, setTimer] = useState(getTimeToNextReset());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimer(getTimeToNextReset());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
   const totalGames = stats.totalGames;
   const winRate =
     totalGames > 0 ? Math.round((stats.totalWins / totalGames) * 100) : 0;
@@ -50,6 +70,29 @@ export const StatsModal: React.FC<Props> = ({ stats, maxTries, onClose }) => {
           <h2>Progresso</h2>
           <CloseButton onClick={onClose}>×</CloseButton>
         </ModalHeader>
+
+        <div
+          style={{
+            textAlign: "center",
+            margin: "0.5em 0 1em 0",
+            fontSize: "1.05em",
+            color: "#153972",
+            fontWeight: 500,
+          }}
+        >
+          Próximo código em:
+          <span
+            style={{
+              marginLeft: 8,
+              fontVariantNumeric: "tabular-nums",
+              fontWeight: 700,
+            }}
+          >
+            {String(timer.hours).padStart(2, "0")}:
+            {String(timer.minutes).padStart(2, "0")}:
+            {String(timer.seconds).padStart(2, "0")}
+          </span>
+        </div>
 
         <StatGrid
           style={{

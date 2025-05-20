@@ -1,5 +1,18 @@
 // src/styles/AppStyles.ts
+
 import styled, { keyframes, css } from "styled-components";
+
+const winAnim = keyframes`
+  0% { transform: scale(1); }
+  30% { transform: scale(1.2) rotate(-5deg);}
+  60% { transform: scale(0.95) rotate(3deg);}
+  100% { transform: scale(1); }
+`;
+const loseAnim = keyframes`
+  0% { background: #f8d7da; }
+  50% { background: #ffb3b3; }
+  100% { background: #f8d7da; }
+`;
 
 // src/styles/AppStyles.ts
 export const Header = styled.header`
@@ -137,6 +150,21 @@ export const RestartButton = styled.button`
   }
 `;
 
+const fadeInUp = keyframes`
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+`;
+
 export const WinnerMessage = styled.div`
   background-color: ${({ theme }) => theme.colors.successBg};
   color: ${({ theme }) => theme.colors.successText};
@@ -145,6 +173,7 @@ export const WinnerMessage = styled.div`
   font-weight: bold;
   margin-bottom: 1rem;
   text-align: center;
+  animation: ${fadeInUp} 1.5s cubic-bezier(0.23, 1, 0.32, 1);
 `;
 
 export const GuessRowContainer = styled.div`
@@ -154,22 +183,38 @@ export const GuessRowContainer = styled.div`
   justify-content: center;
 `;
 
-export const GuessDigit = styled.div<{ color: string; textColor?: string }>`
-  width: 1.8rem; // reduzido de 2.5rem
-  height: 1.8rem; // reduzido de 2.5rem
+export const GuessDigit = styled.div<{
+  color: string;
+  textColor?: string;
+  $animate?: boolean;
+  $animationType?: "win" | "lose";
+}>`
+  width: 1.8rem;
+  height: 1.8rem;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  font-size: 1rem; // reduzido de 1.25rem
+  font-size: 1rem;
   border-radius: 4px;
   background-color: ${({ color }) => color};
   color: ${({ textColor, theme }) => textColor ?? theme.colors.black};
-
+  ${({ $animate, $animationType }) =>
+    $animate &&
+    $animationType === "win" &&
+    css`
+      animation: ${winAnim} 0.7s;
+    `}
+  ${({ $animate, $animationType }) =>
+    $animate &&
+    $animationType === "lose" &&
+    css`
+      animation: ${loseAnim} 0.7s;
+    `}
   @media (max-width: 600px) {
-    width: 1.8rem; // mantido compacto no mobile
+    width: 1.8rem;
     height: 1.8rem;
-    font-size: 0.9rem; // ligeiramente menor no mobile
+    font-size: 0.9rem;
   }
 `;
 

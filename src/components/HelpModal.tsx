@@ -48,6 +48,14 @@ export const HelpModal: React.FC<HelpModalProps> = ({
               botão “Limpar / Novo Jogo”.
             </li>
           </ul>
+          <h3>Importante sobre sequência de vitórias</h3>
+          <ul>
+            <li>
+              Para manter sua sequência de vitórias, é necessário jogar todos os
+              dias. Se você pular um dia sem jogar, sua sequência será zerada
+              automaticamente, mesmo que não conte como derrota ou jogo perdido.
+            </li>
+          </ul>
           <h3>Ações (modo Custom)</h3>
           <ul>
             <li>
