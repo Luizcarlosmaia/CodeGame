@@ -16,12 +16,22 @@ interface Props {
   animationType?: "win" | "lose";
 }
 
-export const GuessRow: React.FC<Props> = ({
+interface GuessRowExtraProps {
+  animateEntry?: boolean;
+}
+
+interface GuessRowStaggerProps extends GuessRowExtraProps {
+  staggerEntry?: boolean;
+}
+
+export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
   guess,
   code,
   mode,
   animate,
   animationType,
+  animateEntry,
+  staggerEntry,
 }) => {
   // placeholder: nenhum dígito ainda
   const isPlaceholder = guess.every((d) => d === "");
@@ -29,13 +39,21 @@ export const GuessRow: React.FC<Props> = ({
   if (mode === "casual") {
     if (isPlaceholder) {
       // Renderiza 4 caixas claras
+      // Usar cor do tema manualmente para o placeholder
       return (
         <GuessRowContainer>
           {[0, 1, 2, 3].map((i) => (
             <GuessDigit
               key={i}
-              color={"#f0f0f0"} // fundo claro para placeholder
-              textColor={"#999"} // dígito (vazio) em cinza
+              color="#dee2e6"
+              textColor="#999"
+              style={
+                typeof window !== "undefined" &&
+                window.matchMedia &&
+                window.matchMedia("(prefers-color-scheme: dark)").matches
+                  ? { backgroundColor: "#3e3e53" }
+                  : undefined
+              }
             >
               &nbsp;
             </GuessDigit>
@@ -46,8 +64,10 @@ export const GuessRow: React.FC<Props> = ({
 
     // se não for placeholder, renderiza feedback normal
     const statuses = getStatuses(guess, code);
+    // Efeito cascata: cada dígito aparece com delay incremental
+    const STAGGER = 80; // ms
     return (
-      <GuessRowContainer>
+      <GuessRowContainer $animateEntry={animateEntry}>
         {guess.map((digit, idx) => {
           let bg = "#dee2e6";
           if (statuses[idx] === "correct") bg = "#28a745";
@@ -59,6 +79,8 @@ export const GuessRow: React.FC<Props> = ({
               color={bg}
               $animate={animate}
               $animationType={animationType}
+              $animateEntry={animateEntry}
+              $entryDelay={animateEntry && staggerEntry ? idx * STAGGER : 0}
             >
               {digit}
             </GuessDigit>

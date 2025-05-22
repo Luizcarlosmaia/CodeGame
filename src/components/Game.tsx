@@ -97,9 +97,10 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
     idx: number;
     type: "win" | "lose";
   }>(null);
+  // Animação de entrada de linha (aparecimento)
+  const [entryRow, setEntryRow] = useState<null | number>(null);
   // Exibe modal automaticamente se já ganhou ou perdeu ao recarregar
   const [, setShowModal] = useState(() => {
-    // Se já ganhou ou perdeu, mostra o modal imediatamente
     return (
       gameState[mode]?.hasWon ||
       (!gameState[mode]?.hasWon &&
@@ -155,53 +156,58 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
     setInputDigits(["", "", "", ""]);
     focusField();
 
-    // Tempo de animação + atraso extra para o modal
-    const ANIMATION_DURATION = 700;
-    const MODAL_DELAY = 1000; // extra
+    // Tempo de animação de entrada + animação de vitória/derrota + delay modal
+    const ENTRY_ANIMATION = 700;
+    const ROW_ANIMATION = 700;
+    const MODAL_DELAY = 400;
 
-    if (isCorrect) {
-      // ——————— Vitória ———————
-      setAnimateRow({ idx: guesses.length, type: "win" });
-      setTimeout(() => {
-        setAnimateRow(null);
+    // Anima entrada da linha recém-preenchida
+    setEntryRow(guesses.length); // nova linha
+    setTimeout(() => {
+      setEntryRow(null);
+      // Se for vitória ou derrota, anima a linha e só depois mostra o modal
+      if (isCorrect) {
+        setAnimateRow({ idx: guesses.length, type: "win" });
         setTimeout(() => {
-          setShowModal(true);
-        }, MODAL_DELAY);
-        const old = loadStats(mode);
-        const used = guesses.length + 1;
-        const s: Stats = {
-          ...old,
-          totalGames: old.totalGames + 1,
-          totalWins: old.totalWins + 1,
-          currentStreak: old.currentStreak + 1,
-          bestStreak: Math.max(old.bestStreak, old.currentStreak + 1),
-          distribution: { ...old.distribution },
-        };
-        s.distribution[used] = (s.distribution[used] || 0) + 1;
-        saveStats(mode, s);
-        onWin(s);
-      }, ANIMATION_DURATION);
-    } else if (nextGuesses.length === maxTries) {
-      // ——————— Derrota no último palpite ———————
-      setAnimateRow({ idx: guesses.length, type: "lose" });
-      setTimeout(() => {
-        setAnimateRow(null);
+          setAnimateRow(null);
+          setTimeout(() => {
+            setShowModal(true);
+          }, MODAL_DELAY);
+          const old = loadStats(mode);
+          const used = guesses.length + 1;
+          const s: Stats = {
+            ...old,
+            totalGames: old.totalGames + 1,
+            totalWins: old.totalWins + 1,
+            currentStreak: old.currentStreak + 1,
+            bestStreak: Math.max(old.bestStreak, old.currentStreak + 1),
+            distribution: { ...old.distribution },
+          };
+          s.distribution[used] = (s.distribution[used] || 0) + 1;
+          saveStats(mode, s);
+          onWin(s);
+        }, ROW_ANIMATION);
+      } else if (nextGuesses.length === maxTries) {
+        setAnimateRow({ idx: guesses.length, type: "lose" });
         setTimeout(() => {
-          setShowModal(true);
-        }, MODAL_DELAY);
-        const old = loadStats(mode);
-        const s: Stats = {
-          ...old,
-          totalGames: old.totalGames + 1,
-          // totalWins não aumenta
-          currentStreak: 0,
-          bestStreak: old.bestStreak,
-          distribution: { ...old.distribution },
-        };
-        saveStats(mode, s);
-        onWin(s);
-      }, ANIMATION_DURATION);
-    }
+          setAnimateRow(null);
+          setTimeout(() => {
+            setShowModal(true);
+          }, MODAL_DELAY);
+          const old = loadStats(mode);
+          const s: Stats = {
+            ...old,
+            totalGames: old.totalGames + 1,
+            // totalWins não aumenta
+            currentStreak: 0,
+            bestStreak: old.bestStreak,
+            distribution: { ...old.distribution },
+          };
+          saveStats(mode, s);
+          onWin(s);
+        }, ROW_ANIMATION);
+      }
+    }, ENTRY_ANIMATION);
   };
 
   const handleClear = () => {
@@ -306,6 +312,8 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
         {mode === "casual" &&
           Array.from({ length: 6 }).map((_, i) => {
             const g = guesses[i] ?? ["", "", "", ""];
+            // Anima entrada apenas para a linha recém-preenchida
+            const animateEntry = entryRow === i && g.some((d) => d !== "");
             return (
               <GuessRow
                 key={i}
@@ -315,6 +323,8 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
                 attempt={i + 1}
                 animate={animateRow?.idx === i}
                 animationType={animateRow?.type}
+                animateEntry={animateEntry}
+                staggerEntry={true}
               />
             );
           })}
@@ -345,10 +355,19 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
                     g,
                     secretCode
                   );
+                  // Animação de entrada para linhas novas (efeito cascata leve)
+                  const ANIMATION_STAGGER = 60;
                   return (
-                    <TableRow key={i}>
+                    <TableRow
+                      key={i}
+                      $animateEntry={true}
+                      style={{
+                        animationDelay: `${i * ANIMATION_STAGGER}ms`,
+                        animationFillMode: "both",
+                      }}
+                    >
                       <TableCell>{i + 1}</TableCell>
-                      <TableCell>{g.join(" ")}</TableCell>
+                      <TableCell $palpite>{g.join(" ")}</TableCell>
                       <TableCell>
                         <Badge variant="success">{correctPlace}</Badge>
                       </TableCell>
