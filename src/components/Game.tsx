@@ -16,7 +16,6 @@ import {
   DigitInput,
   SubmitButton,
   RestartButton,
-  WinnerMessage,
   Counter,
   PageWrapper,
   Content,
@@ -330,15 +329,6 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
               />
             );
           })}
-        {hasWon && <WinnerMessage>🎉 Parabéns! cadeado aberto!</WinnerMessage>}
-        {isLost && !hasWon && (
-          <WinnerMessage
-            as="div"
-            style={{ background: "#f8d7da", color: "#721c24" }}
-          >
-            😞 Você perdeu. O código era {secretCode.join("")}.
-          </WinnerMessage>
-        )}
         {mode === "desafio" && guesses.length > 0 && (
           <>
             <Subtitle>Histórico de tentativas</Subtitle>

@@ -62,13 +62,18 @@ export const BarLabel = styled.span`
   color: ${({ theme }) => theme.colors.black};
 `;
 
-export const BarFill = styled.div`
-  flex: 1;
+export const BarFill = styled.div<{ $width?: number }>`
   background-color: ${({ theme }) => theme.colors.primary};
   color: ${({ theme }) => theme.colors.white};
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.9rem;
+  min-width: 2.2rem;
+  max-width: 100%;
+  width: ${({ $width }) => ($width ? `${$width}%` : "8%")};
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  box-sizing: border-box;
 `;
 
 export const ChartTitle = styled.h3`

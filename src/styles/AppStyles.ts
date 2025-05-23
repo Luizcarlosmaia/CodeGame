@@ -135,7 +135,7 @@ export const Content = styled.div`
   width: 100%;
   max-width: 360px;
   background-color: ${({ theme }) => theme.colors.white};
-  min-height: calc(80vh - 2rem);
+  min-height: calc(75vh - 2rem);
   overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -144,6 +144,13 @@ export const Content = styled.div`
   flex-direction: column;
   gap: 0.35rem;
   align-items: center;
+  @media (min-width: 900px) {
+    max-width: 900px;
+    border-radius: 28px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.13);
+    padding: 1.5rem 5rem;
+    gap: 0.6rem;
+  }
 `;
 export const Controls = styled.div`
   display: flex;
@@ -169,16 +176,25 @@ export const ActionGroup = styled.div`
 
 export const Title = styled.h1`
   font-size: 1.5rem;
+  @media (min-width: 900px) {
+    font-size: 3.2rem;
+  }
   color: ${({ theme }) => theme.colors.primaryDark};
   margin-bottom: 0.5rem;
 `;
 export const Subtitle = styled.p`
   font-size: 1rem;
+  @media (min-width: 900px) {
+    font-size: 2rem;
+  }
   color: ${({ theme }) => theme.colors.primaryDark};
 `;
 // (Removido: duplicata, mantido apenas uma definição de HardModeText)
 export const Counter = styled.div`
   font-size: 0.8rem;
+  @media (min-width: 900px) {
+    font-size: 1.6rem;
+  }
   color: ${({ theme }) => theme.colors.primaryDark};
   margin-bottom: 1rem;
   text-align: center;
@@ -227,6 +243,11 @@ export const DigitInput = styled.input`
   font-size: 1rem;
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: 4px;
+  @media (min-width: 900px) {
+    width: 4rem;
+    height: 4rem;
+    font-size: 2.5rem;
+  }
 `;
 export const SubmitButton = styled.button`
   background-color: ${({ theme }) => theme.colors.primary};
@@ -235,6 +256,11 @@ export const SubmitButton = styled.button`
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 1rem;
+  @media (min-width: 900px) {
+    font-size: 2.2rem;
+    padding: 1.2rem 2.5rem;
+  }
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryDark};
   }
@@ -246,6 +272,11 @@ export const RestartButton = styled.button`
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 1rem;
+  @media (min-width: 900px) {
+    font-size: 2rem;
+    padding: 1.1rem 2.2rem;
+  }
   &:hover {
     background-color: ${({ theme }) => theme.colors.dangerDark};
   }
@@ -255,6 +286,11 @@ export const Keypad = styled.div`
   grid-template-columns: repeat(3, 2rem);
   gap: 0.25rem;
   margin-top: 0.2rem;
+  @media (min-width: 900px) {
+    grid-template-columns: repeat(3, 4.2rem);
+    gap: 1.2rem;
+    margin-top: 2.2rem;
+  }
   @media (max-width: 600px) {
     grid-template-columns: repeat(3, 2.5rem);
     gap: 0.25rem;
@@ -269,6 +305,11 @@ export const Key = styled.button`
   background-color: ${({ theme }) => theme.colors.gray};
   color: ${({ theme }) => theme.colors.numberColor};
   cursor: pointer;
+  @media (min-width: 900px) {
+    width: 4.2rem;
+    height: 4.2rem;
+    font-size: 2.2rem;
+  }
   &:active {
     background-color: ${({ theme }) => theme.colors.primary};
     color: ${({ theme }) => theme.colors.white};
@@ -303,7 +344,10 @@ export const GuessRowContainer = styled.div<{
   $animateEntry?: boolean;
 }>`
   display: flex;
-  gap: 0.25rem; // reduzido de 0.5rem
+  gap: 0.25rem;
+  @media (min-width: 900px) {
+    gap: 0.7rem;
+  }
   flex-wrap: wrap;
   justify-content: center;
   ${({ $animateEntry }) =>
@@ -349,6 +393,12 @@ export const GuessDigit = styled.div<{
       animation-delay: ${$entryDelay || 0}ms;
       animation-fill-mode: both;
     `}
+  @media (min-width: 900px) {
+    width: 3.6rem;
+    height: 3.6rem;
+    font-size: 2rem;
+    border-radius: 8px;
+  }
   @media (max-width: 600px) {
     width: 1.8rem;
     height: 1.8rem;

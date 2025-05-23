@@ -12,12 +12,27 @@ interface Props {
   onToggleDark: () => void;
 }
 
+function isModeFinished(stats: Stats, mode: Mode): boolean {
+  if (mode === "casual" || mode === "desafio") {
+    // Considera finalizado se jogou hoje e ganhou (currentStreak > 0) ou perdeu (jogou e streak zerada)
+    return (
+      stats.currentStreak > 0 ||
+      (stats.totalGames > 0 && stats.currentStreak === 0)
+    );
+  }
+  // Custom nunca abre automaticamente
+  return false;
+}
+
 const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
   const location = useLocation();
   const mode = (location.pathname.replace("/", "") as Mode) || "casual";
 
   const [showHelp, setShowHelp] = useState(false);
-  const [showStats, setShowStats] = useState(false);
+  const [showStats, setShowStats] = useState(() => {
+    const stats = loadStats(mode);
+    return isModeFinished(stats, mode);
+  });
   const [statsByMode, setStatsByMode] = useState<Record<Mode, Stats>>({
     casual: loadStats("casual"),
     desafio: loadStats("desafio"),
@@ -28,6 +43,13 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
     setStatsByMode((prev) => ({ ...prev, [mode]: newStats }));
     setShowStats(true);
   };
+
+  // Sempre que o modo mudar, verifica se deve mostrar o modal automaticamente
+  React.useEffect(() => {
+    const stats = loadStats(mode);
+    setStatsByMode((prev) => ({ ...prev, [mode]: stats }));
+    setShowStats(isModeFinished(stats, mode));
+  }, [mode]);
 
   return (
     <>
