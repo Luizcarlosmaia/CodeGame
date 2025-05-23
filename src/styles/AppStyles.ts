@@ -1,3 +1,9 @@
+// Animação de shake para inputs
+const shakeAnim = keyframes`
+  0%,100% { transform: translateX(0); }
+  20%,60% { transform: translateX(-5px); }
+  40%,80% { transform: translateX(5px); }
+`;
 // =========================
 // KEYFRAMES
 // =========================
@@ -145,10 +151,11 @@ export const Controls = styled.div`
   align-items: center;
   gap: 0.1rem;
 `;
-export const InputArea = styled.div`
+export const InputArea = styled.div<{ shake?: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  animation: ${({ shake }) => (shake ? css`0.3s ${shakeAnim}` : "none")};
 `;
 export const ActionGroup = styled.div`
   display: flex;

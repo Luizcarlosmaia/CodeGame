@@ -48,6 +48,8 @@ interface GameProps {
 }
 
 export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
+  // Estado para animação de shake no input
+  const [shakeInput, setShakeInput] = useState(false);
   const today = todayKey();
 
   // geramos duas seeds diárias distintas
@@ -137,7 +139,12 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
 
   const handleGuess = () => {
     if (hasWon || isLost) return;
-    if (inputDigits.some((d) => !d)) return;
+    if (inputDigits.some((d) => !d)) {
+      setShakeInput(false); // força reset
+      setTimeout(() => setShakeInput(true), 10); // dispara animação
+      setTimeout(() => setShakeInput(false), 350); // limpa após animação
+      return;
+    }
     if (guesses.length >= maxTries) return;
 
     const isCorrect = inputDigits.join("") === secretCode.join("");
@@ -157,8 +164,8 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
     focusField();
 
     // Tempo de animação de entrada + animação de vitória/derrota + delay modal
-    const ENTRY_ANIMATION = 700;
-    const ROW_ANIMATION = 700;
+    const ENTRY_ANIMATION = 500;
+    const ROW_ANIMATION = 500;
     const MODAL_DELAY = 400;
 
     // Anima entrada da linha recém-preenchida
@@ -249,7 +256,7 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
           </Counter>
         </Controls>
 
-        <InputArea>
+        <InputArea as="div" shake={shakeInput}>
           {inputDigits.map((digit, i) => (
             <DigitInput
               key={i}
@@ -266,12 +273,7 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
           ))}
           <SubmitButton
             onClick={handleGuess}
-            disabled={
-              hasWon ||
-              isLost ||
-              inputDigits.some((d) => !d) ||
-              guesses.length >= maxTries
-            }
+            disabled={hasWon || isLost || guesses.length >= maxTries}
           >
             Enviar
           </SubmitButton>
