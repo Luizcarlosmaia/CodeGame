@@ -38,22 +38,14 @@ export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
 
   if (mode === "casual") {
     if (isPlaceholder) {
-      // Renderiza 4 caixas claras
-      // Usar cor do tema manualmente para o placeholder
       return (
         <GuessRowContainer>
           {[0, 1, 2, 3].map((i) => (
             <GuessDigit
               key={i}
-              color="#dee2e6"
-              textColor="#999"
-              style={
-                typeof window !== "undefined" &&
-                window.matchMedia &&
-                window.matchMedia("(prefers-color-scheme: dark)").matches
-                  ? { backgroundColor: "#3e3e53" }
-                  : undefined
-              }
+              color="#dee2e6" // igual ao theme.colors.gray no tema claro
+              textColor="#6c757d" // igual ao theme.colors.grayText no tema claro
+              // No dark, GuessDigit já usa cor do tema, então não precisa forçar via style
             >
               &nbsp;
             </GuessDigit>

@@ -1,4 +1,3 @@
-// src/components/Game.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { GuessRow } from "./GuessRow";
 import { generateCode } from "../utils/generateCode";
@@ -42,20 +41,17 @@ import {
 interface GameProps {
   mode: Mode;
   onWin: (stats: Stats) => void;
-  /** Somente para testes automatizados: força o código secreto */
+  // Força o código secreto apenas para testes automatizados
   __testCode?: string[];
 }
 
 export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
-  // Estado para animação de shake no input
   const [shakeInput, setShakeInput] = useState(false);
   const today = todayKey();
 
-  // geramos duas seeds diárias distintas
   const dailyCasual = generateDailyCode(`${today}-casual`);
   const dailyDesafio = generateDailyCode(`${today}-desafio`);
 
-  // 1) inicializa estado carregando do localStorage (ou cria fallback)
   const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() => {
     const fallback: Record<Mode, SavedMode> = {
       casual: {
@@ -93,38 +89,31 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
     }, {} as Record<Mode, SavedMode>);
   });
 
-  // Animação de vitória/derrota
   const [animateRow, setAnimateRow] = useState<null | {
     idx: number;
     type: "win" | "lose";
   }>(null);
-  // Animação de entrada de linha (aparecimento)
   const [entryRow, setEntryRow] = useState<null | number>(null);
-  // Exibe modal automaticamente se já ganhou ou perdeu ao recarregar
   const [, setShowModal] = useState(() => {
+    const guesses = gameState[mode]?.guesses || [];
+    const hasWon = gameState[mode]?.hasWon;
+    const maxTries = mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity;
     return (
-      gameState[mode]?.hasWon ||
-      (!gameState[mode]?.hasWon &&
-        gameState[mode]?.guesses.length >=
-          (mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity))
+      guesses.length > 0 && (hasWon || (!hasWon && guesses.length >= maxTries))
     );
   });
 
-  // 2) salva no storage sempre que mudar o modo ativo ou seu estado
   useEffect(() => {
     saveGameState(mode, gameState[mode]);
   }, [mode, gameState]);
 
-  // 3) controle de inputs
   const [inputDigits, setInputDigits] = useState<string[]>(["", "", "", ""]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const focusField = (i = 0) => inputRefs.current[i]?.focus();
   useEffect(focusField, []);
 
-  // 4) extrai do estado atual
   const { code: secretCode, guesses, hasWon } = gameState[mode]!;
 
-  // 5) limites e flags
   const maxTries = mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity;
   const isLost = !hasWon && guesses.length >= maxTries;
 
@@ -139,9 +128,9 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
   const handleGuess = () => {
     if (hasWon || isLost) return;
     if (inputDigits.some((d) => !d)) {
-      setShakeInput(false); // força reset
-      setTimeout(() => setShakeInput(true), 10); // dispara animação
-      setTimeout(() => setShakeInput(false), 350); // limpa após animação
+      setShakeInput(false);
+      setTimeout(() => setShakeInput(true), 10);
+      setTimeout(() => setShakeInput(false), 350);
       return;
     }
     if (guesses.length >= maxTries) return;
@@ -162,16 +151,13 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
     setInputDigits(["", "", "", ""]);
     focusField();
 
-    // Tempo de animação de entrada + animação de vitória/derrota + delay modal
     const ENTRY_ANIMATION = 500;
     const ROW_ANIMATION = 500;
     const MODAL_DELAY = 400;
 
-    // Anima entrada da linha recém-preenchida
-    setEntryRow(guesses.length); // nova linha
+    setEntryRow(guesses.length);
     setTimeout(() => {
       setEntryRow(null);
-      // Se for vitória ou derrota, anima a linha e só depois mostra o modal
       if (isCorrect) {
         setAnimateRow({ idx: guesses.length, type: "win" });
         setTimeout(() => {
@@ -204,7 +190,6 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
           const s: Stats = {
             ...old,
             totalGames: old.totalGames + 1,
-            // totalWins não aumenta
             currentStreak: 0,
             bestStreak: old.bestStreak,
             distribution: { ...old.distribution },
@@ -243,7 +228,6 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
 
   const keypad = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, "⌫"] as const;
 
-  // 8) render
   return (
     <PageWrapper>
       <Content>
@@ -309,11 +293,9 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
           </ActionGroup>
         )}
 
-        {/* EASY: placeholders fixos */}
         {mode === "casual" &&
           Array.from({ length: 6 }).map((_, i) => {
             const g = guesses[i] ?? ["", "", "", ""];
-            // Anima entrada apenas para a linha recém-preenchida
             const animateEntry = entryRow === i && g.some((d) => d !== "");
             return (
               <GuessRow
@@ -347,7 +329,6 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
                     g,
                     secretCode
                   );
-                  // Animação de entrada para linhas novas (efeito cascata leve)
                   const ANIMATION_STAGGER = 60;
                   return (
                     <TableRow
