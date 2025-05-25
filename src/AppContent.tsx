@@ -29,6 +29,7 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
   const mode = (location.pathname.replace("/", "") as Mode) || "casual";
 
   const [showHelp, setShowHelp] = useState(false);
+  const [helpTutorial, setHelpTutorial] = useState(false);
   const [showStats, setShowStats] = useState(() => {
     const stats = loadStats(mode);
     return isModeFinished(stats, mode);
@@ -51,18 +52,32 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
     setShowStats(isModeFinished(stats, mode));
   }, [mode]);
 
+  // Exibe o tutorial automaticamente se nunca jogou
+  React.useEffect(() => {
+    const stats = loadStats(mode);
+    if (stats.totalGames === 0) {
+      setShowHelp(true);
+      setHelpTutorial(true);
+    }
+  }, [mode]);
+
   return (
     <>
       <Header
         mode={mode}
         onModeChange={() => {}}
         onShowStats={() => setShowStats(true)}
-        onShowHelp={() => setShowHelp(true)}
+        onShowHelp={() => {
+          setShowHelp(true);
+          setHelpTutorial(false);
+        }}
         isDark={isDark}
         onToggleDark={onToggleDark}
       />
 
-      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {showHelp && (
+        <HelpModal onClose={() => setShowHelp(false)} tutorial={helpTutorial} />
+      )}
       {showStats && (
         <StatsModal
           stats={statsByMode[mode]}
