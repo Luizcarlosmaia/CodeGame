@@ -43,15 +43,39 @@ interface GameProps {
   onWin: (stats: Stats) => void;
   // Força o código secreto apenas para testes automatizados
   __testCode?: string[];
+  // Props para modo controlado (custom)
+  code?: string[];
+  guesses?: string[][];
+  hasWon?: boolean;
+  inputDigits?: string[];
+  setInputDigits?: (digits: string[]) => void;
+  onGuess?: (guess: string[]) => void;
+  onInputChange?: (val: string, idx: number) => void;
+  onClear?: () => void;
+  maxTriesOverride?: number;
 }
 
-export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
+export const Game: React.FC<GameProps> = ({
+  mode,
+  onWin,
+  __testCode,
+  code: codeProp,
+  guesses: guessesProp,
+  hasWon: hasWonProp,
+  inputDigits: inputDigitsProp,
+  setInputDigits: setInputDigitsProp,
+  onGuess,
+  onInputChange,
+  onClear,
+  maxTriesOverride,
+}) => {
   const [shakeInput, setShakeInput] = useState(false);
   const today = todayKey();
 
   const dailyCasual = generateDailyCode(`${today}-casual`);
   const dailyDesafio = generateDailyCode(`${today}-desafio`);
 
+  // Estado local só para modos não-controlados (casual/desafio)
   const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() => {
     const fallback: Record<Mode, SavedMode> = {
       casual: {
@@ -103,22 +127,41 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
     );
   });
 
+  // Só salva no localStorage se não for modo controlado
   useEffect(() => {
+    if (mode === "custom" && (codeProp || guessesProp || hasWonProp)) return;
     saveGameState(mode, gameState[mode]);
-  }, [mode, gameState]);
+  }, [mode, gameState, codeProp, guessesProp, hasWonProp]);
 
-  const [inputDigits, setInputDigits] = useState<string[]>(["", "", "", ""]);
+  // Input controlado ou não
+  const [inputDigitsState, setInputDigitsState] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+  ]);
+  const inputDigits = inputDigitsProp ?? inputDigitsState;
+  const setInputDigits = setInputDigitsProp ?? setInputDigitsState;
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const focusField = (i = 0) => inputRefs.current[i]?.focus();
   useEffect(focusField, []);
 
-  const { code: secretCode, guesses, hasWon } = gameState[mode]!;
+  // Estado do jogo: controlado ou não
+  const secretCode = codeProp ?? gameState[mode]!.code;
+  const guesses = guessesProp ?? gameState[mode]!.guesses;
+  const hasWon = hasWonProp ?? gameState[mode]!.hasWon;
 
-  const maxTries = mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity;
+  const maxTries =
+    maxTriesOverride ??
+    (mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity);
   const isLost = !hasWon && guesses.length >= maxTries;
 
   const handleChange = (val: string, idx: number) => {
     if (!/^[0-9]?$/.test(val) || hasWon || isLost) return;
+    if (onInputChange) {
+      onInputChange(val, idx);
+      return;
+    }
     const next = [...inputDigits];
     next[idx] = val;
     setInputDigits(next);
@@ -134,6 +177,13 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
       return;
     }
     if (guesses.length >= maxTries) return;
+
+    if (onGuess) {
+      onGuess([...inputDigits]);
+      setInputDigits(["", "", "", ""]);
+      focusField();
+      return;
+    }
 
     const isCorrect = inputDigits.join("") === secretCode.join("");
     const nextGuesses = [...guesses, [...inputDigits]];
@@ -202,6 +252,12 @@ export const Game: React.FC<GameProps> = ({ mode, onWin, __testCode }) => {
   };
 
   const handleClear = () => {
+    if (onClear) {
+      onClear();
+      setInputDigits(["", "", "", ""]);
+      focusField();
+      return;
+    }
     setGameState((prev) => ({
       ...prev,
       custom: {

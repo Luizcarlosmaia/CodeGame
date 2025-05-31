@@ -39,7 +39,7 @@ export const Header: React.FC<Props> = ({
           className={({ isActive }) => (isActive ? "active-link" : "")}
           onClick={() => onModeChange(m)}
         >
-          <ModeToggleButton $active={mode === m} disabled={m === "custom"}>
+          <ModeToggleButton $active={mode === m} disabled={false}>
             {m === "casual" ? "Casual" : m === "desafio" ? "Desafio" : "Custom"}
           </ModeToggleButton>
         </NavLink>

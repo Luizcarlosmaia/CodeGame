@@ -7,6 +7,24 @@ import { HelpModal } from "./components/HelpModal";
 import { StatsModal } from "./components/StatsModal";
 import { Header } from "./components/Header";
 
+import styled from "styled-components";
+import CustomRoomFlow from "./components/CustomRoom/CustomRoomFlow";
+import CustomRoomGame from "./components/CustomRoom/CustomRoomGame";
+const CustomPageWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  width: 100%;
+  background: ${({ theme }) => theme.colors.background};
+  padding: 0.1rem;
+  box-sizing: border-box;
+  @media (max-width: 600px) {
+    padding: 0.5rem;
+  }
+`;
+
 interface Props {
   isDark: boolean;
   onToggleDark: () => void;
@@ -53,13 +71,7 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
   }, [mode]);
 
   // Exibe o tutorial automaticamente se nunca jogou
-  React.useEffect(() => {
-    const stats = loadStats(mode);
-    if (stats.totalGames === 0) {
-      setShowHelp(true);
-      setHelpTutorial(true);
-    }
-  }, [mode]);
+  // (Removido: agora só mostra o modal de ajuda ao clicar no botão)
 
   return (
     <>
@@ -96,9 +108,33 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
           path="/desafio"
           element={<Game mode="desafio" onWin={handleWin} />}
         />
+        {/* Rota custom com fluxo de criar/entrar/lobby */}
         <Route
           path="/custom"
-          element={<Game mode="custom" onWin={handleWin} />}
+          element={
+            <CustomPageWrapper>
+              <CustomRoomFlow />
+            </CustomPageWrapper>
+          }
+        />
+        {/* Rota para lobby de sala permanente por ID */}
+        <Route
+          path="/custom/lobby/:roomId"
+          element={
+            <CustomPageWrapper>
+              <CustomRoomFlow />
+            </CustomPageWrapper>
+          }
+        />
+        {/* Rota para tela de jogo custom */}
+        <Route
+          path="/custom/game/:roomId"
+          element={
+            <CustomPageWrapper>
+              {/* TODO: passar userId/userName se necessário */}
+              <CustomRoomGame />
+            </CustomPageWrapper>
+          }
         />
       </Routes>
     </>
