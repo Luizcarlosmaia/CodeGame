@@ -17,6 +17,7 @@ describe("CustomRoomRodadaPainel", () => {
     setGuesses: jest.fn(),
     handleGuess: jest.fn(),
     setRodadaAberta: jest.fn(),
+    setHasFinished: jest.fn(),
   };
 
   it("renderiza o componente e o Game", () => {
@@ -29,6 +30,7 @@ describe("CustomRoomRodadaPainel", () => {
       <CustomRoomRodadaPainel
         {...baseProps}
         hasFinished={{ win: true, tries: 3 }}
+        setHasFinished={jest.fn()}
       />
     );
     expect(screen.getByText(/você ganhou!/i)).toBeInTheDocument();
@@ -39,6 +41,7 @@ describe("CustomRoomRodadaPainel", () => {
       <CustomRoomRodadaPainel
         {...baseProps}
         hasFinished={{ win: false, tries: 6 }}
+        setHasFinished={jest.fn()}
       />
     );
     expect(screen.getByText(/você perdeu!/i)).toBeInTheDocument();
@@ -51,6 +54,7 @@ describe("CustomRoomRodadaPainel", () => {
         {...baseProps}
         hasFinished={{ win: true, tries: 2 }}
         setRodadaAberta={setRodadaAberta}
+        setHasFinished={jest.fn()}
       />
     );
     fireEvent.click(screen.getByRole("button"));

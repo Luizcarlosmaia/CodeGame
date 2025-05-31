@@ -3,7 +3,6 @@ import { renderWithTheme } from "../../test-utils";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import CustomRoomGame from "./CustomRoomGame";
 import * as useCustomRoomHook from "../../hooks/useCustomRoom";
-import React from "react";
 import { vi } from "vitest";
 
 // Mock do hook para simular sala custom
