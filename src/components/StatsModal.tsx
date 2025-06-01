@@ -35,6 +35,7 @@ interface Props {
   stats: Stats;
   maxTries: number;
   onClose: () => void;
+  playedToday?: boolean;
 }
 
 // Utilitário para calcular o tempo restante até o próximo reset (meia-noite local)
@@ -49,7 +50,12 @@ function getTimeToNextReset() {
   return { hours, minutes, seconds };
 }
 
-export const StatsModal: React.FC<Props> = ({ stats, maxTries, onClose }) => {
+export const StatsModal: React.FC<Props> = ({
+  stats,
+  maxTries,
+  onClose,
+  playedToday,
+}) => {
   // Cronômetro para o próximo reset diário
   const [timer, setTimer] = useState(getTimeToNextReset());
   useEffect(() => {
@@ -83,11 +89,14 @@ export const StatsModal: React.FC<Props> = ({ stats, maxTries, onClose }) => {
 
   // Determina se foi vitória, derrota ou só estatística
   let result: "win" | "lose" | null = null;
-  if (totalGames > 0) {
-    if (stats.currentStreak > 0 && stats.totalWins === totalGames) {
-      result = "win";
-    } else if (stats.currentStreak === 0 && winRate < 100) {
-      result = "lose";
+  // Só mostra mensagem se jogou hoje
+  if (playedToday) {
+    if (totalGames > 0) {
+      if (stats.currentStreak > 0 && stats.totalWins === totalGames) {
+        result = "win";
+      } else if (stats.currentStreak === 0 && winRate < 100) {
+        result = "lose";
+      }
     }
   }
 

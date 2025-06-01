@@ -34,7 +34,7 @@ interface Props {
     modos: { modo: string; rodadas: number }[];
     type: "permanente";
   }) => void;
-  onJoin: (roomId: string) => void;
+  onJoin: (roomId: string) => Promise<"already_joined" | false | true | void>;
 }
 
 import { useLocation, useNavigate } from "react-router-dom";
@@ -333,7 +333,7 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
             $shake={shakeInput === "userName" && !!error}
           />
           <Button
-            onClick={() => {
+            onClick={async () => {
               let vibrate = false;
               if (!userName.trim()) {
                 setError("Digite seu nome.");
@@ -347,7 +347,20 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
                 setError("");
                 setShakeInput(null);
                 localStorage.setItem("customRoomUserName", userName.trim());
-                onJoin(joinId.trim());
+                // onJoin agora pode retornar erro
+                const joinResult = await onJoin(joinId.trim());
+                if (joinResult === "already_joined") {
+                  setError("Você já está participando desta sala.");
+                  setShakeInput("joinId");
+                  vibrate = true;
+                  return;
+                }
+                if (joinResult === false) {
+                  setError("Erro ao entrar na sala. Tente novamente.");
+                  setShakeInput("joinId");
+                  vibrate = true;
+                  return;
+                }
               }
               if (vibrate) {
                 if (window.navigator.vibrate) window.navigator.vibrate(120);

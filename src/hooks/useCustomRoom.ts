@@ -60,25 +60,27 @@ export function useCustomRoom(roomId?: string) {
 
       // Verifica se já existe membro com o mesmo id
       const existing = membros.find((m) => m.id === player.id);
-      if (!existing) {
-        // Busca progresso antigo em progressoRemovidos
-        const progressoAntigoObj = progressoRemovidos.find(
-          (p) => p.id === player.id
-        );
-        const progressoAntigo = progressoAntigoObj?.progresso;
-        membros.push({
-          ...player,
-          progresso: progressoAntigo ?? [],
-        });
-        // Remove progressoRemovido desse userId, se existir
-        const progressoRemovidosAtualizado = progressoRemovidos.filter(
-          (p) => p.id !== player.id
-        );
-        await updateDoc(ref, {
-          membros,
-          progressoRemovidos: progressoRemovidosAtualizado,
-        });
+      if (existing) {
+        setLoading(false);
+        return "already_joined";
       }
+      // Busca progresso antigo em progressoRemovidos
+      const progressoAntigoObj = progressoRemovidos.find(
+        (p) => p.id === player.id
+      );
+      const progressoAntigo = progressoAntigoObj?.progresso;
+      membros.push({
+        ...player,
+        progresso: progressoAntigo ?? [],
+      });
+      // Remove progressoRemovido desse userId, se existir
+      const progressoRemovidosAtualizado = progressoRemovidos.filter(
+        (p) => p.id !== player.id
+      );
+      await updateDoc(ref, {
+        membros,
+        progressoRemovidos: progressoRemovidosAtualizado,
+      });
       setLoading(false);
       return true;
     } catch (e) {
@@ -103,8 +105,12 @@ export function useCustomRoom(roomId?: string) {
           data.progressoRemovidos || [];
         // Busca membro a ser removido
         const membroRemovido = membros.find((m) => m.id === userId);
+        if (!membroRemovido) {
+          setLoading(false);
+          return "not_found";
+        }
         // Salva progresso do membro removido, se existir
-        if (membroRemovido && membroRemovido.progresso) {
+        if (membroRemovido.progresso) {
           // Remove qualquer progresso antigo desse userId
           progressoRemovidos = progressoRemovidos.filter(
             (p) => p.id !== userId

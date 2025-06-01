@@ -33,7 +33,7 @@ const CustomRoomRanking: React.FC<CustomRoomRankingProps> = ({
           : 0;
         const isUser = r.playerId === userId;
 
-        // Status visual (sem jogos, em jogo, concluído)
+        // Status visual (sem jogos, em jogo, concluído) — igual painel de rodadas
         let statusLabel = "Sem jogos";
         let statusColor = "#888";
         let statusBg = "#f1f5fa";
@@ -42,19 +42,36 @@ const CustomRoomRanking: React.FC<CustomRoomRankingProps> = ({
             .toISOString()
             .slice(0, 10)
             .replace(/-/g, "");
-          const progressoHoje = membro.progresso.find(
-            (p) => p.data === dataHoje
-          );
-          if (progressoHoje) {
-            if (progressoHoje.terminou) {
-              statusLabel = "Concluído";
-              statusColor = "#388e3c";
-              statusBg = "#eafbe7";
-            } else {
-              statusLabel = "Em jogo";
-              statusColor = "#1976d2";
-              statusBg = "#e3eaf5";
-            }
+          // Descobre quantas rodadas existem (pelo ranking não temos rodadas, mas membros e ranking são passados juntos do Game)
+          // Busca no array de membros do ranking, que é o mesmo do Game, e pega a prop 'rodadas' do primeiro membro que tiver
+          // Mas para garantir, vamos receber o total de rodadas via membros[0]?.progresso ou pelo ranking.length
+          // Melhor: contar rodadas distintas do progresso de todos membros
+          let totalRodadas = 0;
+          if (Array.isArray(membros) && membros.length > 0) {
+            // Busca no ranking do Game, que sempre passa membros e rodadas juntos
+            // Busca o maior número de rodada entre todos os membros
+            const rodadasSet = new Set<number>();
+            membros.forEach((m) => {
+              m.progresso?.forEach((p) => {
+                rodadasSet.add(p.rodada);
+              });
+            });
+            totalRodadas = rodadasSet.size;
+          }
+          // Se não conseguir, fallback para 1
+          if (!totalRodadas) totalRodadas = 1;
+          // Conta quantas rodadas do dia o membro terminou
+          const concluidasHoje = membro.progresso.filter(
+            (p) => p.data === dataHoje && p.terminou
+          ).length;
+          if (concluidasHoje === totalRodadas && totalRodadas > 0) {
+            statusLabel = "Concluído";
+            statusColor = "#388e3c";
+            statusBg = "#eafbe7";
+          } else if (concluidasHoje > 0) {
+            statusLabel = "Em jogo";
+            statusColor = "#1976d2";
+            statusBg = "#e3eaf5";
           }
         }
 

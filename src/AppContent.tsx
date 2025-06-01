@@ -30,16 +30,23 @@ interface Props {
   onToggleDark: () => void;
 }
 
-function isModeFinished(stats: Stats, mode: Mode): boolean {
-  if (mode === "casual" || mode === "desafio") {
-    // Considera finalizado se jogou hoje e ganhou (currentStreak > 0) ou perdeu (jogou e streak zerada)
-    return (
-      stats.currentStreak > 0 ||
-      (stats.totalGames > 0 && stats.currentStreak === 0)
+function isModeFinished(mode: Mode): boolean {
+  if (mode !== "casual" && mode !== "desafio") return false;
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const maxTries = mode === "casual" ? 6 : 15;
+  try {
+    const gameState = JSON.parse(
+      localStorage.getItem(`codeGameState-${mode}`) || "{}"
     );
+    if (gameState.date !== today) return false;
+    if (!Array.isArray(gameState.guesses) || gameState.guesses.length === 0)
+      return false;
+    if (gameState.hasWon === true) return true;
+    if (gameState.guesses.length >= maxTries) return true;
+    return false;
+  } catch {
+    return false;
   }
-  // Custom nunca abre automaticamente
-  return false;
 }
 
 const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
@@ -48,10 +55,8 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
 
   const [showHelp, setShowHelp] = useState(false);
   const [helpTutorial, setHelpTutorial] = useState(false);
-  const [showStats, setShowStats] = useState(() => {
-    const stats = loadStats(mode);
-    return isModeFinished(stats, mode);
-  });
+  // Sempre força a checagem ao montar (corrige bug de não mostrar ao recarregar)
+  const [showStats, setShowStats] = useState(false);
   const [statsByMode, setStatsByMode] = useState<Record<Mode, Stats>>({
     casual: loadStats("casual"),
     desafio: loadStats("desafio"),
@@ -67,7 +72,27 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
   React.useEffect(() => {
     const stats = loadStats(mode);
     setStatsByMode((prev) => ({ ...prev, [mode]: stats }));
-    setShowStats(isModeFinished(stats, mode));
+    // Só mostra automaticamente se o jogo do dia foi finalizado
+    if (isModeFinished(mode)) {
+      setShowStats(true);
+    }
+  }, [mode]);
+
+  // Observa mudanças no localStorage do gameState do modo atual para exibir o modal automaticamente após vitória/derrota ou recarregamento
+  React.useEffect(() => {
+    function checkGameState() {
+      // Só abre automaticamente se o jogo do dia foi finalizado
+      if (isModeFinished(mode)) {
+        setShowStats(true);
+      }
+    }
+    // storage event só dispara entre abas, então também checa por polling
+    window.addEventListener("storage", checkGameState);
+    const interval = setInterval(checkGameState, 1000);
+    return () => {
+      window.removeEventListener("storage", checkGameState);
+      clearInterval(interval);
+    };
   }, [mode]);
 
   // Exibe o tutorial automaticamente se nunca jogou
@@ -95,6 +120,14 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
           stats={statsByMode[mode]}
           maxTries={mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity}
           onClose={() => setShowStats(false)}
+          playedToday={
+            // Só considera que jogou se houve pelo menos um palpite hoje
+            Array.isArray(statsByMode[mode]?.distribution)
+              ? Object.values(statsByMode[mode]?.distribution || {}).some(
+                  (v) => v > 0
+                )
+              : (statsByMode[mode]?.totalGames ?? 0) > 0
+          }
         />
       )}
 

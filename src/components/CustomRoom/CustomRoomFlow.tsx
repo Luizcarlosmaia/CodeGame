@@ -142,12 +142,20 @@ const CustomRoomFlow: React.FC = () => {
     }
     setUserId(thisUserId);
     // Adiciona o membro imediatamente ao Firestore
-    await joinRoom(id, {
+    const joinResult = await joinRoom(id, {
       id: thisUserId,
       nome: thisUserName,
       terminouRodada: false,
       tentativas: [],
     });
+    if (joinResult === "already_joined") {
+      alert("Você já está participando desta sala.");
+      return;
+    }
+    if (joinResult === false) {
+      alert("Erro ao entrar na sala. Tente novamente.");
+      return;
+    }
     // Navega para a URL do lobby da sala ao entrar
     window.location.href = `/custom/lobby/${id}`;
   };

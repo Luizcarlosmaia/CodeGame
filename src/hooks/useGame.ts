@@ -17,25 +17,64 @@ import {
 
 export function useGame(mode: Mode, onWin: (stats: Stats) => void) {
   // --- 1) carregar e armazenar estado completo por modo ---
-  const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() => ({
-    casual: loadGameState("casual"),
-    desafio: loadGameState("desafio"),
-    custom: loadGameState("custom"),
-  }));
+  const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() => {
+    const casual = loadGameState("casual");
+    const desafio = loadGameState("desafio");
+    let custom = loadGameState("custom");
+    // Garante que o modo custom sempre tenha um código válido
+    if (
+      !custom ||
+      !Array.isArray(custom.code) ||
+      custom.code.length !== 4 ||
+      custom.code.some((d) => typeof d !== "string" || d.length !== 1)
+    ) {
+      custom = {
+        code: generateCode(),
+        guesses: [],
+        hasWon: false,
+        date: todayKey(),
+      };
+    }
+    return { casual, desafio, custom };
+  });
 
-  // --- 2) reset diário ---
+  // --- 2) reset diário (corrigido: observa mudança de dia em tempo real) ---
   const todayRef = useRef(todayKey());
   useEffect(() => {
-    const today = todayKey();
-    if (today !== todayRef.current) {
-      todayRef.current = today;
-      const daily = generateDailyCode(today);
-      setGameState((prev) => ({
-        casual: { ...prev.casual, code: daily, guesses: [], hasWon: false },
-        desafio: { ...prev.desafio, code: daily, guesses: [], hasWon: false },
-        custom: prev.custom,
-      }));
-    }
+    const checkDayChange = () => {
+      const today = todayKey();
+      if (today !== todayRef.current) {
+        todayRef.current = today;
+        const daily = generateDailyCode(today);
+        setGameState((prev) => ({
+          casual: {
+            ...prev.casual,
+            code: daily,
+            guesses: [],
+            hasWon: false,
+            date: today,
+          },
+          desafio: {
+            ...prev.desafio,
+            code: daily,
+            guesses: [],
+            hasWon: false,
+            date: today,
+          },
+          custom: {
+            ...prev.custom,
+            code: generateCode(),
+            guesses: [],
+            hasWon: false,
+            date: today,
+          },
+        }));
+      }
+    };
+    // Checa imediatamente e depois a cada minuto
+    checkDayChange();
+    const interval = setInterval(checkDayChange, 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   // --- 3) persistir sempre que o modo for alterado ---

@@ -284,6 +284,24 @@ export const Game: React.FC<GameProps> = ({
 
   const keypad = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, "⌫"] as const;
 
+  // --- Mensagem de vitória/derrota (mesma lógica do StatsModal) ---
+  let result: "win" | "lose" | null = null;
+  let playedToday = false;
+  if (mode === "casual" || mode === "desafio") {
+    const stats = loadStats(mode);
+    const todayStr = todayKey();
+    // Jogou hoje se stats.date === hoje e stats.totalGames > 0 e terminou o jogo
+    playedToday =
+      stats.date === todayStr && stats.totalGames > 0 && (hasWon || isLost);
+    if (playedToday) {
+      if (hasWon) {
+        result = "win";
+      } else if (isLost) {
+        result = "lose";
+      }
+    }
+  }
+
   return (
     <PageWrapper>
       <Content>
@@ -294,6 +312,64 @@ export const Game: React.FC<GameProps> = ({
             {mode === "casual" ? 6 : mode === "desafio" ? 15 : "∞"}
           </Counter>
         </Controls>
+
+        {/* Mensagem de vitória/derrota entre teclado e input, igual StatsModal */}
+        {playedToday && result === "win" && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              margin: "0.2em 0 0.7em 0",
+              padding: "0.35em 0.7em 0.35em 0.5em",
+              background: "#e6f7ec",
+              color: "#217a4b",
+              borderRadius: 8,
+              fontSize: "1.04em",
+              fontWeight: 600,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+              minHeight: 0,
+              maxWidth: 320,
+              marginLeft: "auto",
+              marginRight: "auto",
+              transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
+            }}
+          >
+            <span style={{ fontSize: "1.5em", marginRight: 6, lineHeight: 1 }}>
+              🎉
+            </span>
+            <span>Parabéns! Você acertou o código!</span>
+          </div>
+        )}
+        {playedToday && result === "lose" && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              margin: "0.2em 0 0.7em 0",
+              padding: "0.35em 0.7em 0.35em 0.5em",
+              background: "#fbeaea",
+              color: "#a13a3a",
+              borderRadius: 8,
+              fontSize: "1.01em",
+              fontWeight: 600,
+              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+              minHeight: 0,
+              maxWidth: 320,
+              marginLeft: "auto",
+              marginRight: "auto",
+              transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
+            }}
+          >
+            <span style={{ fontSize: "1.5em", marginRight: 6, lineHeight: 1 }}>
+              😞
+            </span>
+            <span>Não foi dessa vez!</span>
+          </div>
+        )}
 
         <InputArea as="div" shake={shakeInput}>
           {inputDigits.map((digit, i) => (
