@@ -395,5 +395,6 @@ export const RoomRankingBlock: React.FC<{
     membros={membros}
     userId={userId}
     showStatus={false}
+    totalRodadas={0}
   />
 );

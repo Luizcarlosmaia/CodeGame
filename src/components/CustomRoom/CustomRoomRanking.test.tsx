@@ -34,13 +34,25 @@ describe("CustomRoomRanking", () => {
   ];
 
   it("exibe mensagem de ranking vazio", () => {
-    render(<CustomRoomRanking ranking={[]} membros={[]} userId="1" />);
+    render(
+      <CustomRoomRanking
+        ranking={[]}
+        membros={[]}
+        userId="1"
+        totalRodadas={1}
+      />
+    );
     expect(screen.getByText(/sem ranking ainda/i)).toBeInTheDocument();
   });
 
   it("exibe todos os jogadores do ranking", () => {
     render(
-      <CustomRoomRanking ranking={ranking} membros={membros} userId="1" />
+      <CustomRoomRanking
+        ranking={ranking}
+        membros={membros}
+        userId="1"
+        totalRodadas={1}
+      />
     );
     expect(screen.getByText(/alice/i)).toBeInTheDocument();
     expect(screen.getByText(/bob/i)).toBeInTheDocument();
@@ -50,7 +62,12 @@ describe("CustomRoomRanking", () => {
 
   it("destaca o usuário logado", () => {
     render(
-      <CustomRoomRanking ranking={ranking} membros={membros} userId="1" />
+      <CustomRoomRanking
+        ranking={ranking}
+        membros={membros}
+        userId="1"
+        totalRodadas={1}
+      />
     );
     const alice = screen.getByText(/alice/i).closest("li");
     expect(alice).toHaveStyle("color: #388e3c");
@@ -59,7 +76,12 @@ describe("CustomRoomRanking", () => {
 
   it("exibe (já jogou hoje) se aplicável", () => {
     render(
-      <CustomRoomRanking ranking={ranking} membros={membros} userId="1" />
+      <CustomRoomRanking
+        ranking={ranking}
+        membros={membros}
+        userId="1"
+        totalRodadas={1}
+      />
     );
     expect(screen.getByText(/já jogou hoje/i)).toBeInTheDocument();
   });
