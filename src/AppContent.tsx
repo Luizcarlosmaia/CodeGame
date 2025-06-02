@@ -15,13 +15,13 @@ const CustomPageWrapper = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  min-height: 100vh;
+  min-height: 90vh;
   width: 100%;
   background: ${({ theme }) => theme.colors.background};
   padding: 0.1rem;
   box-sizing: border-box;
   @media (max-width: 600px) {
-    padding: 0.5rem;
+    padding: 0.2rem;
   }
 `;
 

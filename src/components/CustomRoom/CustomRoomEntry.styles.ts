@@ -1,3 +1,15 @@
+export const EntryModoBadge = styled.span`
+  background: none;
+  color: #7a8ca3;
+  font-weight: 400;
+  font-size: 0.93em;
+  border: 1px solid #e0e4ea;
+  border-radius: 6px;
+  padding: 2px 8px;
+  display: inline-block;
+  margin-right: 6px;
+  letter-spacing: 0.1px;
+`;
 // Loading box for "Criando sala permanente..."
 export const EntryLoadingBox = styled.div`
   text-align: center;
@@ -140,7 +152,7 @@ export const EntryContainer = styled.div`
   margin-top: 1.5rem;
   margin-left: 0;
   margin-right: 0;
-  padding: 1rem 4rem;
+  padding: 1rem 2rem;
   background: ${({ theme }) => theme.colors.white};
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);

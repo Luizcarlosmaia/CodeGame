@@ -11,7 +11,6 @@ import {
 } from "../utils/stats";
 import {
   Title,
-  Subtitle,
   DigitInput,
   SubmitButton,
   RestartButton,
@@ -282,7 +281,7 @@ export const Game: React.FC<GameProps> = ({
     handleClear();
   };
 
-  const keypad = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, "⌫"] as const;
+  // const keypad = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, "⌫"] as const;
 
   // --- Mensagem de vitória/derrota (mesma lógica do StatsModal) ---
   let result: "win" | "lose" | null = null;
@@ -308,8 +307,8 @@ export const Game: React.FC<GameProps> = ({
         <Controls>
           <Title>Code Game</Title>
           <Counter>
-            Tentativa {hasWon ? guesses.length : guesses.length + 1} de{" "}
-            {mode === "casual" ? 6 : mode === "desafio" ? 15 : "∞"}
+            Tentativa {hasWon || isLost ? guesses.length : guesses.length + 1}{" "}
+            de {mode === "casual" ? 6 : mode === "desafio" ? 15 : "∞"}
           </Counter>
         </Controls>
 
@@ -321,7 +320,6 @@ export const Game: React.FC<GameProps> = ({
               flexDirection: "row",
               alignItems: "center",
               gap: 8,
-              margin: "0.2em 0 0.7em 0",
               padding: "0.35em 0.7em 0.35em 0.5em",
               background: "#e6f7ec",
               color: "#217a4b",
@@ -349,12 +347,11 @@ export const Game: React.FC<GameProps> = ({
               flexDirection: "row",
               alignItems: "center",
               gap: 8,
-              margin: "0.2em 0 0.7em 0",
               padding: "0.35em 0.7em 0.35em 0.5em",
               background: "#fbeaea",
               color: "#a13a3a",
               borderRadius: 8,
-              fontSize: "1.01em",
+              fontSize: "1em",
               fontWeight: 600,
               boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
               minHeight: 0,
@@ -386,38 +383,7 @@ export const Game: React.FC<GameProps> = ({
               inputMode="none"
             />
           ))}
-          <SubmitButton
-            onClick={handleGuess}
-            disabled={hasWon || isLost || guesses.length >= maxTries}
-          >
-            Enviar
-          </SubmitButton>
         </InputArea>
-
-        <Keypad>
-          {keypad.map((k, i) => (
-            <Key
-              key={i}
-              disabled={hasWon || isLost}
-              onClick={() => {
-                if (hasWon || isLost) return;
-                if (k === "⌫") {
-                  const last = inputDigits
-                    .map((d, j) => (d ? j : -1))
-                    .filter((j) => j >= 0)
-                    .pop();
-                  if (last != null) handleChange("", last);
-                } else {
-                  const idx = inputDigits.indexOf("");
-                  if (idx >= 0) handleChange(String(k), idx);
-                }
-              }}
-            >
-              {k}
-            </Key>
-          ))}
-        </Keypad>
-
         {mode === "custom" && (
           <ActionGroup>
             <RestartButton onClick={handleClear}>Resetar Rodada</RestartButton>
@@ -443,9 +409,8 @@ export const Game: React.FC<GameProps> = ({
               />
             );
           })}
-        {mode === "desafio" && guesses.length > 0 && (
+        {mode === "desafio" && (
           <>
-            <Subtitle>Histórico de tentativas</Subtitle>
             <GuessTable>
               <TableHead>
                 <tr>
@@ -456,19 +421,20 @@ export const Game: React.FC<GameProps> = ({
                 </tr>
               </TableHead>
               <TableBody>
-                {guesses.map((g, i) => {
-                  const { correctPlace, correctDigit } = getFeedback(
-                    g,
-                    secretCode
-                  );
-                  const ANIMATION_STAGGER = 60;
+                {Array.from({ length: 15 }).map((_, i) => {
+                  const g = guesses[i] ?? ["", "", "", ""];
+                  const isFilled = i < guesses.length;
+                  const { correctPlace, correctDigit } = isFilled
+                    ? getFeedback(g, secretCode)
+                    : { correctPlace: "-", correctDigit: "-" };
                   return (
                     <TableRow
                       key={i}
-                      $animateEntry={true}
+                      $animateEntry={isFilled}
                       style={{
-                        animationDelay: `${i * ANIMATION_STAGGER}ms`,
-                        animationFillMode: "both",
+                        background: isFilled ? undefined : "#f5f5f5",
+                        color: isFilled ? undefined : "#bbb",
+                        opacity: isFilled ? 1 : 0.7,
                       }}
                     >
                       <TableCell>{i + 1}</TableCell>
@@ -486,6 +452,52 @@ export const Game: React.FC<GameProps> = ({
             </GuessTable>
           </>
         )}
+        <div
+          style={{ width: "100%", display: "flex", justifyContent: "center" }}
+        >
+          <Keypad>
+            {[7, 8, 9, 4, 5, 6, 1, 2, 3, 0].map((k) => (
+              <Key
+                key={k}
+                disabled={hasWon || isLost}
+                onClick={() => {
+                  if (hasWon || isLost) return;
+                  const idx = inputDigits.indexOf("");
+                  if (idx >= 0) handleChange(String(k), idx);
+                }}
+              >
+                {k}
+              </Key>
+            ))}
+            <Key
+              disabled={hasWon || isLost}
+              onClick={() => {
+                if (hasWon || isLost) return;
+                const last = inputDigits
+                  .map((d, j) => (d ? j : -1))
+                  .filter((j) => j >= 0)
+                  .pop();
+                if (last != null) handleChange("", last);
+              }}
+            >
+              ⌫
+            </Key>
+          </Keypad>
+        </div>
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <SubmitButton
+            onClick={handleGuess}
+            disabled={hasWon || isLost || guesses.length >= maxTries}
+          >
+            Enviar
+          </SubmitButton>
+        </div>
       </Content>
     </PageWrapper>
   );

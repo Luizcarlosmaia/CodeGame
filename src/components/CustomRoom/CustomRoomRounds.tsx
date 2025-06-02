@@ -36,53 +36,11 @@ export const CustomRoomRounds: React.FC<RoundsProps> = ({
   }
   // Nova lógica: status geral do dia
   const dataHoje = todayKey();
-  const totalRodadas = rodadas.length;
-  const concluidasHoje = rodadas.filter((rodada) => {
-    const progresso = player?.progresso?.find(
-      (p) => p.rodada === rodada.rodada && p.data === dataHoje
-    );
-    return progresso && progresso.terminou;
-  }).length;
-  const todasConcluidas = totalRodadas > 0 && concluidasHoje === totalRodadas;
 
   return (
     <RoundList>
       {rodadas && rodadas.length > 0 ? (
         <>
-          {/* Status geral do dia */}
-          <RoundItem key="status-geral">
-            <RoundCard>
-              <RoundStatus
-                terminou={todasConcluidas}
-                win={false}
-                style={{
-                  color: todasConcluidas ? "#388e3c" : "#1976d2",
-                  background: todasConcluidas ? "#eafbe7" : "#e3eaf5",
-                  borderRadius: 8,
-                  padding: "4px 12px",
-                  display: "inline-block",
-                  fontWeight: 700,
-                  fontSize: 15,
-                  marginBottom: 6,
-                }}
-              >
-                {todasConcluidas ? "Concluído" : "Em jogo"}
-                {todasConcluidas && (
-                  <span
-                    style={{
-                      color: "#888",
-                      fontWeight: 400,
-                      marginLeft: 8,
-                      fontSize: 13,
-                    }}
-                  >
-                    (todas as rodadas do dia jogadas)
-                  </span>
-                )}
-              </RoundStatus>
-            </RoundCard>
-          </RoundItem>
-          {/* Lista de rodadas individuais */}
           {rodadas.map((rodada) => {
             const progresso = player?.progresso?.find(
               (p) => p.rodada === rodada.rodada && p.data === dataHoje
@@ -106,7 +64,34 @@ export const CustomRoomRounds: React.FC<RoundsProps> = ({
             return (
               <RoundItem key={rodada.rodada}>
                 <RoundCard>
-                  <RoundTitle>Rodada {rodada.rodada}</RoundTitle>
+                  <RoundTitle
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span>Rodada {rodada.rodada}</span>
+                    {terminou && rodada.codigo && (
+                      <span
+                        className="codigo-badge"
+                        style={{
+                          fontWeight: 600,
+                          color: "#1976d2",
+                          fontSize: 13,
+                          background: "#e3eaf5",
+                          borderRadius: 6,
+                          padding: "2px 8px",
+                          marginLeft: 0,
+                          letterSpacing: 1,
+                          display: "inline-block",
+                        }}
+                      >
+                        Código: {rodada.codigo}
+                      </span>
+                    )}
+                  </RoundTitle>
                   <RoundStatus
                     terminou={!!terminou}
                     win={!!progresso?.win}
@@ -155,6 +140,7 @@ export const CustomRoomRounds: React.FC<RoundsProps> = ({
                     )}
                   {!terminou && (
                     <RoundPlayButton
+                      data-testid={`play-round-${rodada.rodada}`}
                       onClick={() => setRodadaAberta(rodada.rodada)}
                     >
                       Jogar rodada

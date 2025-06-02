@@ -302,14 +302,15 @@ const CustomRoomGame: React.FC = () => {
     palpites: string[][]
   ) {
     if (!room || !rodadaInfo || !rodadaInfo.rodada) return;
+
     try {
       const { doc, updateDoc, getDoc } = await import("firebase/firestore");
       const { db } = await import("../../firebase");
       const ref = doc(db, "rooms", room.id);
       const dataHoje = todayKey();
-
       const palpitesSerializados = palpites.map((p) => p.join(""));
 
+      // Busca o progresso mais recente do Firestore antes de salvar
       const snap = await getDoc(ref);
       if (!snap.exists()) throw new Error("Sala não encontrada");
       const data = snap.data();
@@ -321,11 +322,15 @@ const CustomRoomGame: React.FC = () => {
       const membrosAtualizados = membros.map((m) => {
         if (m.id !== userId) return m;
         membroEncontrado = true;
-        let progresso = Array.isArray(m.progresso) ? [...m.progresso] : [];
-        progresso = progresso.filter(
+        let progressoRemoto = Array.isArray(m.progresso)
+          ? [...m.progresso]
+          : [];
+        // Remove progresso duplicado do mesmo dia/rodada
+        progressoRemoto = progressoRemoto.filter(
           (p) => !(p.rodada === rodadaInfo.rodada.rodada && p.data === dataHoje)
         );
-        progresso.push({
+        // Adiciona o progresso atual
+        progressoRemoto.push({
           rodada: rodadaInfo.rodada.rodada,
           data: dataHoje,
           tentativas,
@@ -333,7 +338,7 @@ const CustomRoomGame: React.FC = () => {
           win,
           palpites: palpitesSerializados,
         });
-        return { ...m, progresso };
+        return { ...m, progresso: progressoRemoto };
       });
 
       let membrosFinal = membrosAtualizados;
@@ -358,7 +363,30 @@ const CustomRoomGame: React.FC = () => {
           },
         ];
       }
-      await updateDoc(ref, { membros: membrosFinal });
+
+      // Atualiza o campo 'codigo' da rodada correspondente no array 'rodadas'
+      // Recupera rodadas atuais do snapshot
+      const rodadasAtualizadas = Array.isArray(data.rodadas)
+        ? [...data.rodadas]
+        : [];
+      const rodadaIdxToUpdate = rodadasAtualizadas.findIndex(
+        (r) => r.rodada === rodadaInfo.rodada.rodada
+      );
+      if (rodadaIdxToUpdate !== -1) {
+        // Atualiza o campo codigo apenas se estiver vazio ou diferente
+        const codigoCorreto = rodadaInfo.code.join("");
+        if (rodadasAtualizadas[rodadaIdxToUpdate].codigo !== codigoCorreto) {
+          rodadasAtualizadas[rodadaIdxToUpdate] = {
+            ...rodadasAtualizadas[rodadaIdxToUpdate],
+            codigo: codigoCorreto,
+          };
+        }
+      }
+
+      await updateDoc(ref, {
+        membros: membrosFinal,
+        rodadas: rodadasAtualizadas,
+      });
 
       const roomSnap = await getDoc(ref);
       if (!roomSnap.exists()) return;
@@ -515,6 +543,7 @@ const CustomRoomGame: React.FC = () => {
                 ranking={room!.ranking}
                 membros={room!.membros}
                 userId={userId}
+                totalRodadas={room!.rodadas.length}
               />
             </RankingCard>
           </Card>

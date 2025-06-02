@@ -92,6 +92,7 @@ const CustomRoomFlow: React.FC = () => {
       modo: data.modos[0]?.modo || "casual",
       rodadaAtual: 1,
       rodadas, // agora populado!
+      modos: data.modos, // <-- garante que o campo modos é salvo
       ranking: [],
       aberta: true,
       criadaEm: new Date().toISOString(),

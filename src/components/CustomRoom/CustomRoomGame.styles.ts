@@ -16,11 +16,11 @@ export const RoundCard = styled.div`
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(25, 118, 210, 0.08);
   border: 1.5px solid #e3eaf5;
-  padding: 14px 10px 10px 10px;
-  margin-bottom: 14px;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.5rem;
   @media (max-width: 600px) {
     padding: 8px 3vw 7px 3vw;
     border-radius: 8px;
@@ -34,7 +34,7 @@ export const RoundTitle = styled.div`
   font-weight: 700;
   color: #1976d2;
   @media (max-width: 600px) {
-    font-size: 1rem;
+    font-size: 0.92rem;
   }
 `;
 
@@ -48,7 +48,7 @@ export const RoundStatus = styled.div<{ terminou: boolean; win: boolean }>`
   gap: 6px;
   margin-bottom: 2px;
   @media (max-width: 600px) {
-    font-size: 13px;
+    font-size: 11px;
     padding: 2px 7px !important;
     border-radius: 6px !important;
   }
@@ -58,7 +58,7 @@ export const RoundGuessesLabel = styled.span`
   font-size: 12px;
   color: #555;
   @media (max-width: 600px) {
-    font-size: 11px;
+    font-size: 9.5px;
   }
 `;
 
@@ -79,7 +79,7 @@ export const RoundGuess = styled.li`
   color: #1976d2;
   font-weight: 700;
   @media (max-width: 600px) {
-    font-size: 11px;
+    font-size: 10px;
     padding: 2px 5px;
   }
 `;
@@ -96,7 +96,7 @@ export const RoundPlayButton = styled.button`
   margin-top: 6px;
   transition: background 0.18s;
   @media (max-width: 600px) {
-    font-size: 13px;
+    font-size: 12px;
     padding: 7px 12px;
     border-radius: 6px;
   }
@@ -177,25 +177,37 @@ import styled from "styled-components";
 
 export const MainContainer = styled.div`
   max-width: 900px;
-  margin: 12px auto 0 auto;
+  margin: 8px auto 0 auto;
   padding: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
+  @media (max-width: 600px) {
+    max-width: 100vw;
+    margin: 0;
+    padding: 0;
+  }
 `;
 
 export const Card = styled.div`
   background: #f8fafc;
-  border-radius: 18px;
-  box-shadow: 0 2px 12px rgba(25, 118, 210, 0.1);
-  padding: 28px 18px 24px 18px;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(25, 118, 210, 0.08);
+  padding: 1rem;
   width: 100%;
-  min-height: 540px;
+  min-height: 900px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  position: relative;
+
+  max-width: 900px;
+  margin: 10px 0 10px 0;
+  @media (max-width: 600px) {
+    max-width: 96vw;
+    padding: 6px 2vw 10px 2vw;
+    margin: 4px 0 4px 0;
+  }
 `;
 
 export const RoomName = styled.div`
@@ -214,6 +226,9 @@ export const RoundsTitle = styled.h3`
   margin-bottom: 16px;
   font-size: 20px;
   font-weight: 800;
+  @media (max-width: 600px) {
+    font-size: 1rem;
+  }
 `;
 
 export const RoundsList = styled.ul`
@@ -238,6 +253,9 @@ export const RankingTitle = styled.div`
   margin-bottom: 10px;
   text-align: center;
   width: 100%;
+  @media (max-width: 600px) {
+    font-size: 0.95rem;
+  }
 `;
 
 export const RankingList = styled.ol`

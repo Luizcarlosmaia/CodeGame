@@ -71,7 +71,6 @@ const tableRowFadeIn = keyframes`
 export const Header = styled.header`
   width: 100%;
   max-width: 600px;
-  margin: 0 auto 0.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -142,7 +141,7 @@ export const Content = styled.div`
   padding: 1rem 2rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
   align-items: center;
   @media (min-width: 900px) {
     max-width: 900px;
@@ -182,13 +181,6 @@ export const Title = styled.h1`
   color: ${({ theme }) => theme.colors.primaryDark};
   margin-bottom: 0.5rem;
 `;
-export const Subtitle = styled.p`
-  font-size: 1rem;
-  @media (min-width: 900px) {
-    font-size: 2rem;
-  }
-  color: ${({ theme }) => theme.colors.primaryDark};
-`;
 // (Removido: duplicata, mantido apenas uma definição de HardModeText)
 export const Counter = styled.div`
   font-size: 0.8rem;
@@ -196,7 +188,7 @@ export const Counter = styled.div`
     font-size: 1.6rem;
   }
   color: ${({ theme }) => theme.colors.primaryDark};
-  margin-bottom: 1rem;
+  margin-bottom: 0.1rem;
   text-align: center;
 `;
 
@@ -254,15 +246,32 @@ export const SubmitButton = styled.button`
   color: ${({ theme }) => theme.colors.white};
   padding: 0.5rem 1rem;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 1rem;
+  font-weight: 700;
+  height: 2.5rem;
+  min-width: 10rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(25, 118, 210, 0.08);
+  transition: background 0.18s;
+  grid-column: span 2;
   @media (min-width: 900px) {
     font-size: 2.2rem;
     padding: 1.2rem 2.5rem;
+    height: 4.2rem;
+    min-width: 10rem;
   }
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryDark};
+  }
+  @media (max-width: 600px) {
+    font-size: 1.05rem;
+    padding: 0.2em 0.2em;
+    height: 2.5rem;
+    min-width: 10rem;
   }
 `;
 export const RestartButton = styled.button`
@@ -283,17 +292,20 @@ export const RestartButton = styled.button`
 `;
 export const Keypad = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 2rem);
-  gap: 0.25rem;
+  grid-template-columns: repeat(3, min-content);
+  grid-auto-rows: min-content;
+  gap: 0.5rem;
   margin-top: 0.2rem;
+  justify-content: center;
+  align-items: center;
+  width: auto;
+  margin-left: auto;
+  margin-right: auto;
   @media (min-width: 900px) {
-    grid-template-columns: repeat(3, 4.2rem);
-    gap: 1.2rem;
-    margin-top: 2.2rem;
+    gap: 0.5rem;
   }
   @media (max-width: 600px) {
-    grid-template-columns: repeat(3, 2.5rem);
-    gap: 0.25rem;
+    gap: 0.13rem;
   }
 `;
 export const Key = styled.button`
@@ -425,7 +437,7 @@ export const TableHead = styled.thead`
   background-color: ${({ theme }) => theme.colors.primary};
 `;
 export const TableHeader = styled.th`
-  padding: 0.4rem 0.6rem;
+  padding: 0.2rem 0.6rem;
   color: ${({ theme }) => theme.colors.white};
   text-align: center;
   font-weight: 400;
@@ -447,7 +459,7 @@ export const TableRow = styled.tr<{ $animateEntry?: boolean }>`
     `}
 `;
 export const TableCell = styled.td<{ $palpite?: boolean }>`
-  padding: 0.3rem 0.5rem;
+  padding: 0.1rem 0.5rem;
   text-align: center;
   color: ${({ $palpite, theme }) =>
     $palpite ? theme.colors.numberColor : theme.colors.black};

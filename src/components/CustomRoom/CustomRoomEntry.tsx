@@ -19,6 +19,7 @@ import {
   EntryLoadingBox,
   EntryTypeLabel,
   EntryErrorMsg,
+  EntryModoBadge,
 } from "./CustomRoomEntry.styles";
 import { ModeInput } from "./CustomRoomEntryExtra.styles";
 
@@ -375,7 +376,6 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
 
       {tab === "permanentes" && (
         <Section>
-          <Label>Salas permanentes</Label>
           {loadingPermanent && <div>Carregando...</div>}
           {!loadingPermanent && permanentRooms.length === 0 && (
             <div>Nenhuma sala permanente disponível.</div>
@@ -387,15 +387,18 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
                   <b>{room.nome}</b>{" "}
                   <EntryPermanentId>[{room.id}]</EntryPermanentId>
                   <EntryPermanentModos>
-                    Modos:{" "}
-                    {Array.isArray(room.modos) && room.modos.length > 0
-                      ? room.modos
-                          .map(
-                            (m: { modo: string; rodadas: number }) =>
-                              `${m.modo} (${m.rodadas})`
-                          )
-                          .join(", ")
-                      : "-"}
+                    {Array.isArray(room.modos) && room.modos.length > 0 ? (
+                      room.modos.map((m: { modo: string; rodadas: number }) => (
+                        <EntryModoBadge key={m.modo}>
+                          {m.modo.charAt(0).toUpperCase() + m.modo.slice(1)} ·{" "}
+                          {m.rodadas} rodada{m.rodadas === 1 ? "" : "s"}
+                        </EntryModoBadge>
+                      ))
+                    ) : (
+                      <span style={{ color: "#b0b8c9", fontWeight: 500 }}>
+                        -
+                      </span>
+                    )}
                   </EntryPermanentModos>
                 </div>
                 <EntryPermanentBtn
