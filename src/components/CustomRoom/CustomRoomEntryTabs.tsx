@@ -114,7 +114,6 @@ export const TabEntrar: React.FC<{
   );
 };
 
-// Tab Permanentes
 export const TabPermanentes: React.FC<{
   permanentRooms: {
     id: string;

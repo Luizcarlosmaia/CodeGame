@@ -35,7 +35,7 @@ export const MainActionButton = styled.button`
   &:hover {
     background: #1251a3;
   }
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     font-size: 14px;
     padding: 8px 10px;
     border-radius: 6px;
@@ -49,7 +49,7 @@ export const ErrorMsg = styled.div`
   text-align: center;
   margin: 24px 0;
   font-size: 15px;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     font-size: 13px;
     margin: 14px 0;
   }
@@ -60,7 +60,7 @@ export const StatusMsg = styled.div`
   font-weight: 500;
   font-size: 15px;
   padding: 10px;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     font-size: 13px;
     padding: 7px 2vw;
   }
@@ -71,7 +71,7 @@ export const InfoMsg = styled.div`
   font-size: 14px;
   margin-top: 2px;
   text-align: center;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     font-size: 12px;
   }
 `;
@@ -96,7 +96,7 @@ export const LeaveButton = styled.button<{ $leaving?: boolean }>`
   box-shadow: 0 2px 8px rgba(211, 47, 47, 0.08);
   transition: background 0.18s, color 0.18s;
   opacity: ${({ $leaving }) => ($leaving ? 0.6 : 1)};
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     font-size: 13px;
     padding: 8px 10px;
     border-radius: 6px;
@@ -143,7 +143,7 @@ export const RoomHeaderCard = styled.div`
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     padding: 14px 4vw 10px 4vw;
     border-radius: 9px;
   }
@@ -171,7 +171,7 @@ export const RankingCard = styled.section`
   padding: 18px 14px 14px 14px;
   margin-top: 32px;
   margin-bottom: 10px;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     padding: 12px 3vw 10px 3vw;
     border-radius: 8px;
   }
@@ -186,7 +186,7 @@ export const RoundCard = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     padding: 12px 4vw 10px 4vw;
     border-radius: 8px;
   }
@@ -250,7 +250,7 @@ export const CardSection = styled.section`
   box-shadow: 0 1.5px 8px rgba(25, 118, 210, 0.07);
   padding: 20px 16px 18px 16px;
   margin-bottom: 22px;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     padding: 14px 4vw 12px 4vw;
     border-radius: 8px;
   }
@@ -280,7 +280,7 @@ export const RoomTitle = styled.h2`
   font-size: 1.25rem;
   margin-bottom: 10px;
   text-align: center;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     font-size: 1.05rem;
     margin-bottom: 7px;
   }

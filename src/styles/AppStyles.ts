@@ -112,7 +112,7 @@ export const PageWrapper = styled.div`
   min-height: 100vh;
   padding: 0.1rem;
   background-color: ${({ theme }) => theme.colors.background};
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     padding: 0.5rem;
   }
 `;
@@ -132,13 +132,13 @@ export const Container = styled.div`
 `;
 export const Content = styled.div`
   width: 100%;
-  max-width: 360px;
+  max-width: 460px;
   background-color: ${({ theme }) => theme.colors.white};
   min-height: calc(75vh - 2rem);
   overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 1rem 2rem;
+  padding: 1rem 5rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -147,7 +147,7 @@ export const Content = styled.div`
     max-width: 900px;
     border-radius: 28px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.13);
-    padding: 1.5rem 5rem;
+    padding: 0.7rem 5rem;
     gap: 0.6rem;
   }
 `;
@@ -229,15 +229,15 @@ export const InputRow = styled.div<{ shake?: boolean }>`
       : "none"};
 `;
 export const DigitInput = styled.input`
-  width: 2rem;
-  height: 2rem;
+  width: 3rem;
+  height: 3rem;
   text-align: center;
-  font-size: 1rem;
+  font-size: 2.5rem;
   border: 1px solid ${({ theme }) => theme.colors.inputBorder};
   border-radius: 4px;
   @media (min-width: 900px) {
-    width: 4rem;
-    height: 4rem;
+    width: 3rem;
+    height: 3rem;
     font-size: 2.5rem;
   }
 `;
@@ -267,9 +267,9 @@ export const SubmitButton = styled.button`
   &:hover {
     background-color: ${({ theme }) => theme.colors.primaryDark};
   }
-  @media (max-width: 600px) {
-    font-size: 1.05rem;
-    padding: 0.2em 0.2em;
+  @media (max-width: 899px) {
+    font-size: 1.65rem;
+    padding: 0.2em 2.2em;
     height: 2.5rem;
     min-width: 10rem;
   }
@@ -304,8 +304,8 @@ export const Keypad = styled.div`
   @media (min-width: 900px) {
     gap: 0.5rem;
   }
-  @media (max-width: 600px) {
-    gap: 0.13rem;
+  @media (max-width: 899px) {
+    gap: 0.23rem;
   }
 `;
 export const Key = styled.button`
@@ -319,7 +319,7 @@ export const Key = styled.button`
   cursor: pointer;
   @media (min-width: 900px) {
     width: 4.2rem;
-    height: 4.2rem;
+    height: 3.2rem;
     font-size: 2.2rem;
   }
   &:active {
@@ -331,16 +331,12 @@ export const Key = styled.button`
       cursor: not-allowed;
     }
   }
-  @media (max-width: 600px) {
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1rem;
+  @media (max-width: 899px) {
+    width: 4rem;
+    height: 3rem;
+    font-size: 1.5rem;
   }
 `;
-
-// =========================
-// GUESS ROW
-// =========================
 
 export const WinnerMessage = styled.div`
   background-color: ${({ theme }) => theme.colors.successBg};
@@ -376,14 +372,14 @@ export const GuessDigit = styled.div<{
   $animateEntry?: boolean;
   $entryDelay?: number;
 }>`
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 1.5rem;
+  height: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
   font-size: 1rem;
-  border-radius: 4px;
+  border-radius: 5px;
   background-color: ${({ color }) => color};
   color: ${({ textColor, theme }) => textColor ?? theme.colors.black};
   ${({ $animate, $animationType }) =>
@@ -406,21 +402,17 @@ export const GuessDigit = styled.div<{
       animation-fill-mode: both;
     `}
   @media (min-width: 900px) {
-    width: 3.6rem;
-    height: 3.6rem;
+    width: 3rem;
+    height: 3rem;
     font-size: 2rem;
     border-radius: 8px;
   }
-  @media (max-width: 600px) {
-    width: 1.8rem;
-    height: 1.8rem;
-    font-size: 0.9rem;
+  @media (max-width: 899px) {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.9rem;
   }
 `;
-
-// =========================
-// TABLE
-// =========================
 
 export const HardModeText = styled.p`
   font-size: 0.9rem;
@@ -545,18 +537,19 @@ export const Overlay = styled.div`
 `;
 export const ModalBox = styled.div`
   background: ${({ theme }) => theme.colors.white};
-  padding: 1.5rem;
-  max-width: 320px;
-  width: 90%;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  padding: 2.2rem 2.2rem 2rem 2.2rem;
+  max-width: 540px;
+  width: 96%;
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
   position: relative;
   color: ${({ theme }) => theme.colors.primaryDark};
-  max-height: 90vh;
+  max-height: 92vh;
   overflow-y: auto;
-  @media (max-width: 400px) {
-    max-width: 280px;
-    padding: 1rem;
+  @media (max-width: 600px) {
+    max-width: 99vw;
+    padding: 1.1rem 0.5rem 1.1rem 0.5rem;
+    border-radius: 8px;
   }
 `;
 export const ModalHeader = styled.header`

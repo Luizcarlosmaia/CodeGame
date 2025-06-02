@@ -5,9 +5,9 @@ export const EntryModoBadge = styled.span`
   font-size: 0.93em;
   border: 1px solid #e0e4ea;
   border-radius: 6px;
-  padding: 2px 8px;
+  padding: 0.2rem;
   display: inline-block;
-  margin-right: 6px;
+  margin: 0.2rem;
   letter-spacing: 0.1px;
 `;
 // Loading box for "Criando sala permanente..."
@@ -44,14 +44,14 @@ import styled from "styled-components";
 // Padrão consistente para CustomRoomEntry
 export const EntryTabs = styled.div`
   display: flex;
-  gap: 5px;
-  justify-content: stretch;
-  align-items: stretch;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
   margin-bottom: 24px;
   width: 100%;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
   }
 `;
 
@@ -59,28 +59,35 @@ export const EntryTab = styled.button<{ $active?: boolean }>`
   background: ${({ $active, theme }) =>
     $active ? theme.colors.primary : "#eee"};
   color: ${({ $active, theme }) => ($active ? theme.colors.white : "#333")};
-  font-size: 1.1rem;
-  font-weight: ${({ $active }) => ($active ? 700 : 600)};
+  font-size: 1.25rem;
+  font-weight: ${({ $active }) => ($active ? 800 : 700)};
   border: none;
-  border-radius: 10px 10px 0 0;
-  padding: 1rem 0.5rem;
-  min-width: 0;
-  flex: 1 1 0;
+  border-radius: 14px 14px 0 0;
+  padding: 1.2rem 2.2rem;
+  min-width: 120px;
+  flex: 0 0 auto;
   text-align: center;
   cursor: pointer;
   margin: 0;
   box-shadow: ${({ $active }) =>
-    $active ? "0 2px 8px rgba(25, 118, 210, 0.08)" : "none"};
+    $active ? "0 2px 12px rgba(25, 118, 210, 0.12)" : "none"};
   transition: background 0.2s, color 0.2s;
-  height: 56px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  @media (max-width: 600px) {
+  white-space: nowrap;
+  @media (max-width: 899px) {
     width: 100%;
+    min-width: 0;
+    padding: 1.1rem 0.5rem;
+    font-size: 1.1rem;
+    height: 54px;
+  }
+  
     font-size: 1.05rem;
     padding: 1rem 0;
-    height: 48px;
+    height: 50px;
   }
 `;
 
@@ -94,7 +101,7 @@ export const EntryPermanentItem = styled.li`
   margin-bottom: 10px;
   border: none;
   border-radius: 14px;
-  padding: 10px 12px 12px 12px;
+  padding: 1rem;
   background: #fafdff;
   display: flex;
   flex-direction: column;
@@ -106,18 +113,18 @@ export const EntryPermanentItem = styled.li`
     background: #f1f7fb;
     box-shadow: 0 4px 18px rgba(25, 118, 210, 0.13);
   }
-  @media (max-width: 600px) {
-    padding: 8px 2vw 10px 2vw;
+  @media (max-width: 899px) {
+    padding: 1rem;
     border-radius: 10px;
-    gap: 4px;
+    gap: 1rem;
   }
 `;
 
 export const EntryPermanentId = styled.span`
   color: #b0b8c9;
-  font-weight: 500;
+  font-weight: 600;
   margin-left: 4px;
-  font-size: 0.93em;
+  font-size: 0.73em;
 `;
 
 export const EntryPermanentModos = styled.div`
@@ -175,7 +182,7 @@ export const FieldsRow = styled.div`
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  @media (max-width: 600px) {
+  @media (max-width: 900px) {
     flex-direction: column;
     gap: 6px;
   }
@@ -216,13 +223,13 @@ export const ModeRow = styled.div`
 `;
 
 export const Button = styled.button`
-  padding: 1rem 8rem;
+  padding: 1rem 6rem;
   border-radius: 28px;
   border: none;
   background: #1976d2;
   color: #fff;
   font-weight: bold;
-  font-size: 1rem;
+  font-size: 1.3rem;
   cursor: pointer;
   margin-right: 8px;
   transition: background 0.2s;

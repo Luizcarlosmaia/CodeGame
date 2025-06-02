@@ -20,7 +20,7 @@ const CustomPageWrapper = styled.div`
   background: ${({ theme }) => theme.colors.background};
   padding: 0.1rem;
   box-sizing: border-box;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     padding: 0.2rem;
   }
 `;

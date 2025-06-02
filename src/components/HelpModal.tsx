@@ -141,7 +141,10 @@ export const HelpModal: React.FC<HelpModalProps> = ({
               <strong>Desafio:</strong> 15 tentativas, feedback só com totais.
             </li>
             <li>
-              <strong>Custom:</strong> modo livre para jogar com amigos.
+              <strong>Custom:</strong> modo livre para jogar com amigos. Crie
+              uma sala, compartilhe o código e jogue rodadas em grupo! Cada
+              rodada tem um código diferente e todos podem tentar adivinhar. O
+              ranking é atualizado a cada rodada.
             </li>
           </ul>
 
@@ -225,14 +228,14 @@ export const HelpModal: React.FC<HelpModalProps> = ({
               letterSpacing: 0.2,
             }}
           >
-            Ações Especiais (Custom)
+            Regras do modo Custom
           </h3>
           <ul style={{ marginBottom: 12 }}>
+            <li>Crie ou entre em uma sala para jogar com amigos.</li>
+            <li>Cada rodada tem um código diferente, todos jogam juntos.</li>
             <li>
-              <strong>Limpar Rodada:</strong> apaga palpites.
-            </li>
-            <li>
-              <strong>Novo Jogo:</strong> novo código, zera histórico.
+              O ranking é atualizado a cada rodada, mostrando desempenho dos
+              participantes.
             </li>
           </ul>
 

@@ -384,8 +384,17 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
             {permanentRooms.map((room) => (
               <EntryPermanentItem key={room.id}>
                 <div>
-                  <b>{room.nome}</b>{" "}
-                  <EntryPermanentId>[{room.id}]</EntryPermanentId>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      width: "100%",
+                    }}
+                  >
+                    <b>{room.nome}</b>
+                    <EntryPermanentId>[{room.id}]</EntryPermanentId>
+                  </div>
                   <EntryPermanentModos>
                     {Array.isArray(room.modos) && room.modos.length > 0 ? (
                       room.modos.map((m: { modo: string; rodadas: number }) => (

@@ -145,7 +145,7 @@ const ConfigCard = styled.li`
   align-items: center;
   gap: 8px;
   transition: box-shadow 0.18s;
-  @media (max-width: 600px) {
+  @media (max-width: 899px) {
     font-size: 0.65rem;
     padding: 0.1rem;
     border-radius: 77px;

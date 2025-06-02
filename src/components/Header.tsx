@@ -47,9 +47,11 @@ export const Header: React.FC<Props> = ({
     </NavGroup>
 
     <NavGroup>
-      <ActiveIconButton onClick={onShowStats} aria-label="Estatísticas">
-        <BarChartIcon />
-      </ActiveIconButton>
+      {mode !== "custom" && (
+        <ActiveIconButton onClick={onShowStats} aria-label="Estatísticas">
+          <BarChartIcon />
+        </ActiveIconButton>
+      )}
       <PlainIconButton onClick={onShowHelp} aria-label="Como jogar">
         ?
       </PlainIconButton>
