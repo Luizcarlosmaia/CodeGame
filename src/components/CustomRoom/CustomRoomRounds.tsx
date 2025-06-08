@@ -102,7 +102,7 @@ export const CustomRoomRounds: React.FC<RoundsProps> = ({
                       padding: "4px 12px",
                       display: "inline-block",
                       fontWeight: 700,
-                      fontSize: 15,
+                      fontSize: 13,
                       marginBottom: 6,
                     }}
                   >
@@ -113,7 +113,7 @@ export const CustomRoomRounds: React.FC<RoundsProps> = ({
                           color: "#888",
                           fontWeight: 400,
                           marginLeft: 8,
-                          fontSize: 13,
+                          fontSize: 10,
                         }}
                       >
                         ({tentativas} tentativa{tentativas === 1 ? "" : "s"})

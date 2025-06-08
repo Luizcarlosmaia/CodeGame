@@ -1,16 +1,18 @@
 import React, { useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useCustomRoom } from "../../hooks/useCustomRoom";
 import { generateDailyCode } from "../../utils/generateDailyCode";
 import {
   RankingCard,
   RankingTitle,
-  BackButton,
   RoomHeader,
-  RoundsTitle,
   MainContainer,
   Card,
+  GameMainWrapper,
+  GameLeftCol,
+  GameRightCol,
 } from "./CustomRoomGame.styles";
+import BackButton from "../BackButton";
 import CustomRoomRanking from "./CustomRoomRanking";
 import { CustomRoomRounds } from "./CustomRoomRounds";
 import CustomRoomRodadaPainel from "./CustomRoomRodadaPainel";
@@ -22,7 +24,6 @@ function todayKey() {
 
 const CustomRoomGame: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const navigate = useNavigate();
   const [rodadaAberta, setRodadaAberta] = useState<number | null>(null);
 
   const userId = useMemo(() => {
@@ -46,92 +47,8 @@ const CustomRoomGame: React.FC = () => {
     code: string[];
     maxTries: number;
   } | null>(null);
-  // Mantém a última rodadaInfo válida enquanto hasFinished estiver preenchido
-  const [lastRodadaInfo, setLastRodadaInfo] = useState<typeof rodadaInfo>(null);
 
-  React.useEffect(() => {
-    // LOG: Mudança de dependências essenciais
-
-    // [CustomRoomGame] useEffect rodadaAberta/room/userId
-    // Sempre limpa tudo se dependências essenciais não existem
-    if (
-      rodadaAberta === null ||
-      !room ||
-      !room.id ||
-      !room.rodadas ||
-      room.rodadas.length === 0
-    ) {
-      // [CustomRoomGame] Limpando rodadaInfo (rodadaAberta null ou room inválido)
-      setRodadaInfo(null);
-      setGuesses([]);
-      setInputDigits(["", "", "", ""]);
-      setHasWon(false);
-      // Não limpa hasFinished aqui!
-      return;
-    }
-
-    type RodadaConfig = { rodada: number; modo?: string; codigo?: string };
-    const rodadasConfig: RodadaConfig[] =
-      room.rodadas && room.rodadas.length > 0
-        ? (room.rodadas as RodadaConfig[])
-        : Array.from({ length: 1 }, (_, i) => ({
-            rodada: i + 1,
-            modo: "casual",
-          }));
-
-    const player = room?.membros?.find((m) => m.id === userId);
-
-    const rodadaIdx = rodadasConfig.findIndex((r) => r.rodada === rodadaAberta);
-    const rodada = rodadasConfig[rodadaIdx];
-    if (!rodada) {
-      setRodadaInfo(null);
-      setGuesses([]);
-      setInputDigits(["", "", "", ""]);
-      setHasWon(false);
-      // Não limpa hasFinished aqui!
-      return;
-    }
-
-    const allowedModes = ["casual", "desafio", "custom"] as const;
-    function isAllowedMode(m: unknown): m is (typeof allowedModes)[number] {
-      return (
-        typeof m === "string" && (allowedModes as readonly string[]).includes(m)
-      );
-    }
-    const modo = isAllowedMode(rodada.modo) ? rodada.modo : "casual";
-    const code = rodada.codigo
-      ? rodada.codigo.split("")
-      : generateDailyCode(
-          `${todayKey()}-${room.id}-rodada${rodada.rodada}-modo${modo}`
-        );
-    // Define limite de tentativas por modo
-    let maxTries = 10;
-    if (modo === "casual") maxTries = 6;
-    else if (modo === "desafio") maxTries = 15;
-    const info = { rodadaIdx, rodada, modo, code, maxTries };
-    setRodadaInfo(info);
-    setLastRodadaInfo(info);
-
-    // [CustomRoomGame] setRodadaInfo
-
-    // Busca progresso do jogador nesta rodada e data
-    const dataHoje = todayKey();
-    const progresso = player?.progresso?.find(
-      (p) => p.rodada === rodada.rodada && p.data === dataHoje
-    );
-    if (progresso && progresso.terminou) {
-      setHasWon(!!progresso.win);
-      setHasFinished({
-        win: !!progresso.win,
-        tries: progresso.tentativas,
-      });
-    } else {
-      setHasWon(false);
-      setHasFinished(null);
-    }
-    setGuesses([]);
-    setInputDigits(["", "", "", ""]);
-  }, [rodadaAberta, room, userId]);
+  // --- NOVA LÓGICA: só renderiza o dashboard moderno e overlay de rodada ---
 
   const { joinRoom } = useCustomRoom(roomId);
   const [joining, setJoining] = useState(false);
@@ -186,6 +103,23 @@ const CustomRoomGame: React.FC = () => {
 
   type RodadaConfig = { rodada: number; modo?: string; codigo?: string };
 
+  // --- Sincronização robusta: só sobrescreve progresso local se remoto mudou e não houve alteração local recente ---
+  const lastRemoteProgressRef = React.useRef<{
+    rodada: number;
+    data: string;
+    palpites: string[];
+    terminou: boolean;
+    win: boolean;
+    tentativas: number;
+  } | null>(null);
+  // Flag para saber se houve alteração local desde o último sync remoto
+  const localChangedRef = React.useRef(false);
+
+  // Sempre que guesses mudam localmente, marca que houve alteração local
+  React.useEffect(() => {
+    localChangedRef.current = true;
+  }, [guesses, hasWon, hasFinished]);
+
   React.useEffect(() => {
     if (
       rodadaAberta === null ||
@@ -198,6 +132,9 @@ const CustomRoomGame: React.FC = () => {
       setGuesses([]);
       setInputDigits(["", "", "", ""]);
       setHasWon(false);
+      setHasFinished(null);
+      lastRemoteProgressRef.current = null;
+      localChangedRef.current = false;
       return;
     }
 
@@ -219,6 +156,9 @@ const CustomRoomGame: React.FC = () => {
       setGuesses([]);
       setInputDigits(["", "", "", ""]);
       setHasWon(false);
+      setHasFinished(null);
+      lastRemoteProgressRef.current = null;
+      localChangedRef.current = false;
       return;
     }
 
@@ -234,23 +174,96 @@ const CustomRoomGame: React.FC = () => {
       : generateDailyCode(
           `${todayKey()}-${room.id}-rodada${rodada.rodada}-modo${modo}`
         );
-    // Define limite de tentativas por modo
     let maxTries = 10;
     if (modo === "casual") maxTries = 6;
     else if (modo === "desafio") maxTries = 15;
     setRodadaInfo({ rodadaIdx, rodada, modo, code, maxTries });
 
+    // --- RESTAURA PROGRESSO DO FIRESTORE DE FORMA ROBUSTA ---
     const dataHoje = todayKey();
-    const progresso = player?.progresso?.find(
-      (p) => p.rodada === rodada.rodada && p.data === dataHoje
-    );
-    if (progresso && progresso.terminou) {
-      setHasWon(true);
-    } else {
-      setHasWon(false);
+    // Sempre prioriza progresso finalizado, se houver mais de um para a rodada/data
+    const progressoList =
+      player?.progresso?.filter(
+        (p) => p.rodada === rodada.rodada && p.data === dataHoje
+      ) || [];
+    const progresso = progressoList.find((p) => p.terminou) || progressoList[0];
+    if (progresso) {
+      const palpitesFirestore = Array.isArray(progresso.palpites)
+        ? progresso.palpites
+        : [];
+      const palpitesLocal = guesses.map((g) => g.join(""));
+      const isSameGuesses =
+        palpitesFirestore.length === palpitesLocal.length &&
+        palpitesFirestore.every((p, i) => p === palpitesLocal[i]);
+      const isSameWin = hasWon === !!progresso.win;
+      const isSameFinished =
+        (hasFinished?.win ?? null) ===
+          (progresso.terminou ? !!progresso.win : null) &&
+        (hasFinished?.tries ?? null) ===
+          (progresso.terminou ? progresso.tentativas : null);
+
+      // Só sincroniza se o progresso remoto for diferente do local
+      const remoteObj = {
+        rodada: progresso.rodada,
+        data: progresso.data,
+        palpites: palpitesFirestore,
+        terminou: !!progresso.terminou,
+        win: !!progresso.win,
+        tentativas: progresso.tentativas,
+      };
+      const lastRemote = lastRemoteProgressRef.current;
+      const isRemoteChanged =
+        !lastRemote ||
+        lastRemote.rodada !== remoteObj.rodada ||
+        lastRemote.data !== remoteObj.data ||
+        lastRemote.palpites.length !== remoteObj.palpites.length ||
+        lastRemote.palpites.some((p, i) => p !== remoteObj.palpites[i]) ||
+        lastRemote.terminou !== remoteObj.terminou ||
+        lastRemote.win !== remoteObj.win ||
+        lastRemote.tentativas !== remoteObj.tentativas;
+
+      // Se houve alteração local, libera o lock assim que o remoto refletir o local
+      if (
+        localChangedRef.current &&
+        isSameGuesses &&
+        isSameWin &&
+        isSameFinished
+      ) {
+        localChangedRef.current = false;
+      }
+
+      // Só sobrescreve local se remoto mudou E não houve alteração local desde último sync
+      if (
+        (!isSameGuesses || !isSameWin || !isSameFinished) &&
+        (!localChangedRef.current || isRemoteChanged)
+      ) {
+        setGuesses(palpitesFirestore.map((p) => p.split("")));
+        setInputDigits(["", "", "", ""]);
+        if (progresso.terminou) {
+          setHasWon(!!progresso.win);
+          setHasFinished({ win: !!progresso.win, tries: progresso.tentativas });
+        } else {
+          setHasWon(false);
+          setHasFinished(null);
+        }
+        lastRemoteProgressRef.current = remoteObj;
+        localChangedRef.current = false;
+      } else if (isRemoteChanged) {
+        // Mesmo se não sobrescrever local, atualiza o ref para o novo remoto
+        lastRemoteProgressRef.current = remoteObj;
+      }
+      return;
     }
-    setGuesses([]);
-    setInputDigits(["", "", "", ""]);
+
+    // Só reseta local se NÃO houver progresso salvo para esta rodada/data
+    if (guesses.length > 0 || hasWon || hasFinished) {
+      setGuesses([]);
+      setInputDigits(["", "", "", ""]);
+      setHasWon(false);
+      setHasFinished(null);
+      lastRemoteProgressRef.current = null;
+      localChangedRef.current = false;
+    }
   }, [rodadaAberta, room, userId]);
 
   const handleGuess = (guess: string[]) => {
@@ -271,30 +284,94 @@ const CustomRoomGame: React.FC = () => {
     // A verificação de vitória/derrota será feita no useEffect abaixo
   };
 
-  // Novo useEffect para controlar vitória/derrota após guesses mudar
+  // Salva progresso parcial a cada novo palpite (se não finalizou)
   React.useEffect(() => {
-    // [CustomRoomGame] useEffect guesses
     if (!rodadaInfo) return;
     if (hasFinished) return;
     const lastGuess = guesses[guesses.length - 1];
     if (!lastGuess) return;
     const isCorrect = lastGuess.join("") === rodadaInfo.code.join("");
 
+    // Salva progresso parcial no Firestore
+    savePartialProgress(guesses);
+
     // [CustomRoomGame] Novo palpite
     if (isCorrect) {
       setHasWon(true);
       setHasFinished({ win: true, tries: guesses.length });
-
-      // [CustomRoomGame] Vitória detectada
       handleWinCustomRoom(guesses.length, true, guesses);
     } else if (guesses.length >= (rodadaInfo.maxTries || Infinity)) {
       setHasFinished({ win: false, tries: guesses.length });
-
-      // [CustomRoomGame] Derrota detectada
       handleWinCustomRoom(guesses.length, false, guesses);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guesses, rodadaInfo, hasFinished]);
+
+  // Função para salvar progresso parcial (palpites) no Firestore
+  async function savePartialProgress(guessesArr: string[][]) {
+    if (!room || !rodadaInfo || !rodadaInfo.rodada) return;
+    try {
+      const { doc, updateDoc, getDoc } = await import("firebase/firestore");
+      const { db } = await import("../../firebase");
+      const ref = doc(db, "rooms", room.id);
+      const dataHoje = todayKey();
+      const palpitesSerializados = guessesArr.map((p) => p.join(""));
+      // Busca o progresso mais recente do Firestore antes de salvar
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const membros: typeof room.membros = Array.isArray(data.membros)
+        ? [...data.membros]
+        : [];
+      let membroEncontrado = false;
+      const membrosAtualizados = membros.map((m) => {
+        if (m.id !== userId) return m;
+        membroEncontrado = true;
+        let progressoRemoto = Array.isArray(m.progresso)
+          ? [...m.progresso]
+          : [];
+        // Remove progresso duplicado do mesmo dia/rodada
+        progressoRemoto = progressoRemoto.filter(
+          (p) => !(p.rodada === rodadaInfo.rodada.rodada && p.data === dataHoje)
+        );
+        // Adiciona o progresso parcial
+        progressoRemoto.push({
+          rodada: rodadaInfo.rodada.rodada,
+          data: dataHoje,
+          tentativas: guessesArr.length,
+          terminou: false,
+          win: false,
+          palpites: palpitesSerializados,
+        });
+        return { ...m, progresso: progressoRemoto };
+      });
+      let membrosFinal = membrosAtualizados;
+      if (!membroEncontrado) {
+        membrosFinal = [
+          ...membrosAtualizados,
+          {
+            id: userId,
+            nome: localStorage.getItem("customRoomUserName") || "Visitante",
+            terminouRodada: false,
+            tentativas: [],
+            progresso: [
+              {
+                rodada: rodadaInfo.rodada.rodada,
+                data: dataHoje,
+                tentativas: guessesArr.length,
+                terminou: false,
+                win: false,
+                palpites: palpitesSerializados,
+              },
+            ],
+          },
+        ];
+      }
+      await updateDoc(ref, { membros: membrosFinal });
+    } catch {
+      // Silencia erro de escrita parcial
+    }
+  }
 
   async function handleWinCustomRoom(
     tentativas: number,
@@ -467,27 +544,16 @@ const CustomRoomGame: React.FC = () => {
     return <>{renderContent}</>;
   }
 
+  // Corrige erro de lastRodadaInfo: não existe mais, então só usa rodadaInfo
   let painelRodada = null;
-  // Exibe o painel da rodada enquanto hasFinished estiver preenchido, mesmo que rodadaAberta seja null
-  // Usa a última rodadaInfo válida para garantir que o overlay tenha contexto
   if (
     (rodadaAberta !== null && rodadaInfo && rodadaInfo.rodada) ||
     hasFinished
   ) {
-    const infoToUse =
-      rodadaInfo && rodadaInfo.rodada ? rodadaInfo : lastRodadaInfo;
-
-    console.log("[CustomRoomGame] Render painelRodada", {
-      rodadaAberta,
-      rodadaInfo,
-      lastRodadaInfo,
-      hasFinished,
-      infoToUse,
-    });
-    if (infoToUse) {
+    if (rodadaInfo && rodadaInfo.rodada) {
       painelRodada = (
         <CustomRoomRodadaPainel
-          rodadaInfo={infoToUse}
+          rodadaInfo={rodadaInfo}
           guesses={guesses}
           hasWon={hasWon}
           hasFinished={hasFinished}
@@ -497,6 +563,7 @@ const CustomRoomGame: React.FC = () => {
           handleGuess={handleGuess}
           setRodadaAberta={setRodadaAberta}
           setHasFinished={setHasFinished}
+          roomId={roomId}
         />
       );
     }
@@ -508,44 +575,29 @@ const CustomRoomGame: React.FC = () => {
         painelRodada
       ) : (
         <MainContainer>
-          <Card>
-            <BackButton onClick={() => navigate(`/custom/lobby/${roomId}`)}>
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 20 20"
-                fill="none"
-                style={{ marginRight: 2 }}
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12.5 15L8 10.5L12.5 6"
-                  stroke="#1976d2"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Voltar
-            </BackButton>
+          <Card style={{ padding: 0 }}>
+            <BackButton to={roomId ? `/custom/lobby/${roomId}` : "/desafios"} />
             <RoomHeader>{room?.nome}</RoomHeader>
-            <RoundsTitle>Rodadas</RoundsTitle>
-            {/* Lista de rodadas extraída para componente */}
-            <CustomRoomRounds
-              rodadas={room!.rodadas}
-              player={player}
-              setRodadaAberta={setRodadaAberta}
-            />
-            {/* Ranking */}
-            <RankingCard>
-              <RankingTitle>Ranking</RankingTitle>
-              <CustomRoomRanking
-                ranking={room!.ranking}
-                membros={room!.membros}
-                userId={userId}
-                totalRodadas={room!.rodadas.length}
-              />
-            </RankingCard>
+            <GameMainWrapper>
+              <GameLeftCol>
+                <CustomRoomRounds
+                  rodadas={room!.rodadas}
+                  player={player}
+                  setRodadaAberta={setRodadaAberta}
+                />
+              </GameLeftCol>
+              <GameRightCol>
+                <RankingCard style={{ marginTop: 0 }}>
+                  <RankingTitle>Ranking</RankingTitle>
+                  <CustomRoomRanking
+                    ranking={room!.ranking}
+                    membros={room!.membros}
+                    userId={userId}
+                    totalRodadas={room!.rodadas.length}
+                  />
+                </RankingCard>
+              </GameRightCol>
+            </GameMainWrapper>
           </Card>
         </MainContainer>
       )}

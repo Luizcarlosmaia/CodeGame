@@ -29,23 +29,7 @@ describe("CustomRoomEntry", () => {
     localStorage.clear();
   });
 
-  it("renders tabs and default to 'criar'", () => {
-    renderEntry();
-    // Tab buttons
-    expect(
-      screen.getAllByRole("button", { name: /criar sala/i })[0]
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: /entrar/i })[0]
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: /salas fixas/i })[0]
-    ).toBeInTheDocument();
-    // Form fields
-    expect(screen.getByLabelText(/nome da sala/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/seu nome/i)).toBeInTheDocument();
-    expect(screen.getByText(/modos e rodadas/i)).toBeInTheDocument();
-  });
+  // Removed obsolete tab rendering test (tabs removed in new flow)
 
   it("shows error if trying to create with missing fields", async () => {
     renderEntry();

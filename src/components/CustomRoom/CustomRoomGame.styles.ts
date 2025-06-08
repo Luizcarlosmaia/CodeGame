@@ -1,3 +1,38 @@
+import styled from "styled-components";
+export const GameMainWrapper = styled.div`
+  display: flex;
+  flex-direction: row;
+  gap: 32px;
+  align-items: flex-start;
+  justify-content: center;
+  margin-left: 30px;
+  width: 1100px;
+  @media (max-width: 899px) {
+    flex-direction: column;
+    gap: 4px;
+    width: 300px;
+    margin-left: 0;
+    align-items: center;
+  }
+`;
+
+export const GameLeftCol = styled.div`
+  width: 450px;
+  max-width: 95%;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+`;
+
+export const GameRightCol = styled.div`
+  width: 450px;
+  min-width: 260px;
+  max-width: 95%;
+  @media (max-width: 899px) {
+    width: 100%;
+    max-width: 100%;
+  }
+`;
 export const RoundList = styled.ul`
   list-style: none;
   padding: 0;
@@ -16,22 +51,27 @@ export const RoundCard = styled.div`
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(25, 118, 210, 0.08);
   border: 1.5px solid #e3eaf5;
-  padding: 1rem;
+  padding: 3rem;
   margin-bottom: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   @media (max-width: 899px) {
-    padding: 8px 3vw 7px 3vw;
     border-radius: 8px;
     margin-bottom: 8px;
+    display: flex
     gap: 4px;
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    align-content: flex-start;
   }
 `;
 
 export const RoundTitle = styled.div`
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 400;
   color: #1976d2;
   @media (max-width: 899px) {
     font-size: 0.92rem;
@@ -165,27 +205,26 @@ export const BackButton = styled.button`
 `;
 
 export const RoomHeader = styled.div`
-  font-size: 14px;
+  font-size: 30px;
   color: #1976d2;
-  font-weight: 700;
-  margin-bottom: 10px;
+  font-weight: 600;
   text-align: center;
   width: 100%;
   opacity: 0.85;
+  margin-bottom: 16px;
 `;
-import styled from "styled-components";
 
 export const MainContainer = styled.div`
-  max-width: 900px;
-  margin: 8px auto 0 auto;
+  max-width: 1100px;
+  margin: 50px auto 0 auto;
   padding: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
   @media (max-width: 899px) {
-    max-width: 100vw;
-    margin: 0;
+    max-width: 300px;
+    margin: 60px;
     padding: 0;
   }
 `;
@@ -201,7 +240,7 @@ export const Card = styled.div`
   flex-direction: column;
   align-items: center;
 
-  max-width: 900px;
+  max-width: 1100px;
   margin: 10px 0 10px 0;
   @media (max-width: 899px) {
     max-width: 96vw;
@@ -241,9 +280,12 @@ export const RankingCard = styled.div`
   background: #f8fafc;
   border-radius: 12px;
   box-shadow: 0 1.5px 8px rgba(25, 118, 210, 0.07);
-  padding: 18px 14px 14px 14px;
-  margin-top: 32px;
-  width: 100%;
+  padding: 1rem 2.5rem;
+  width: 350px;
+  @media (max-width: 899px) {
+    width: 100%;
+    padding: 1rem 0.5rem;
+  }
 `;
 
 export const RankingTitle = styled.div`
@@ -259,7 +301,6 @@ export const RankingTitle = styled.div`
 `;
 
 export const RankingList = styled.ol`
-  padding-left: 2px;
   margin: 0;
   text-align: left;
   width: 100%;

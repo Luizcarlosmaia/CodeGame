@@ -25,7 +25,6 @@ export const Header: React.FC<Props> = ({
   mode,
   onModeChange,
   onShowStats,
-  onShowHelp,
   isDark,
   onToggleDark,
 }) => (
@@ -52,9 +51,11 @@ export const Header: React.FC<Props> = ({
           <BarChartIcon />
         </ActiveIconButton>
       )}
-      <PlainIconButton onClick={onShowHelp} aria-label="Como jogar">
-        ?
-      </PlainIconButton>
+      <NavLink to="/ajuda" style={{ textDecoration: "none" }}>
+        <PlainIconButton as="span" aria-label="Como jogar">
+          ?
+        </PlainIconButton>
+      </NavLink>
       <ThemeToggleWrapper>
         <ActiveIconButton
           active={isDark}

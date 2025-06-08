@@ -53,10 +53,8 @@ export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
         </GuessRowContainer>
       );
     }
-
-    // se não for placeholder, renderiza feedback normal
     const statuses = getStatuses(guess, code);
-    // Efeito cascata: cada dígito aparece com delay incremental
+
     const STAGGER = 80; // ms
     return (
       <GuessRowContainer $animateEntry={animateEntry}>
@@ -81,8 +79,6 @@ export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
       </GuessRowContainer>
     );
   }
-
-  // modo desafio continua igual
   const { correctPlace, correctDigit } = getFeedback(guess, code);
   return (
     <HardModeText>

@@ -1,19 +1,20 @@
 // src/App.tsx
-import React, { useState } from "react";
-import { ThemeProvider } from "styled-components";
+import React from "react";
+
 import { BrowserRouter } from "react-router-dom";
+
 import { GlobalStyles } from "./styles/GlobalStyles";
-import { theme, darkTheme } from "./theme";
 import AppContent from "./AppContent";
+import { ThemeProvider } from "styled-components";
+import { theme } from "./theme";
 
 export const App: React.FC = () => {
-  const [isDark, setIsDark] = useState(true);
-
+  // Força o uso do tema claro, mas sem lógica de alternância
   return (
-    <ThemeProvider theme={isDark ? darkTheme : theme}>
+    <ThemeProvider theme={theme}>
       <GlobalStyles />
       <BrowserRouter>
-        <AppContent isDark={isDark} onToggleDark={() => setIsDark((d) => !d)} />
+        <AppContent />
       </BrowserRouter>
     </ThemeProvider>
   );

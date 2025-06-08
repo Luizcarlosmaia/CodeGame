@@ -134,7 +134,7 @@ export const StatsModal: React.FC<Props> = ({
             <span style={{ fontSize: "1.5em", marginRight: 6, lineHeight: 1 }}>
               🎉
             </span>
-            <span>Parabéns! Você acertou o código!</span>
+            <span>Você acertou o código!</span>
           </div>
         )}
         {result === "lose" && (

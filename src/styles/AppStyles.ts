@@ -106,6 +106,7 @@ export const ToggleButton = styled.button`
 
 export const PageWrapper = styled.div`
   display: flex;
+  margin-top: 3.5rem;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
@@ -144,6 +145,7 @@ export const Content = styled.div`
   gap: 0.25rem;
   align-items: center;
   @media (min-width: 900px) {
+    margin-top: 2rem;
     max-width: 900px;
     border-radius: 28px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.13);
@@ -155,7 +157,7 @@ export const Controls = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.1rem;
+  gap: 0.5rem;
 `;
 export const InputArea = styled.div<{ shake?: boolean }>`
   display: flex;
@@ -259,9 +261,9 @@ export const SubmitButton = styled.button`
   transition: background 0.18s;
   grid-column: span 2;
   @media (min-width: 900px) {
-    font-size: 2.2rem;
-    padding: 1.2rem 2.5rem;
-    height: 4.2rem;
+    font-size: 2rem;
+    padding: 1rem 2rem;
+    height: 3.2rem;
     min-width: 10rem;
   }
   &:hover {
@@ -318,9 +320,9 @@ export const Key = styled.button`
   color: ${({ theme }) => theme.colors.numberColor};
   cursor: pointer;
   @media (min-width: 900px) {
-    width: 4.2rem;
-    height: 3.2rem;
-    font-size: 2.2rem;
+    width: 4.5rem;
+    height: 2.2rem;
+    font-size: 1.7rem;
   }
   &:active {
     background-color: ${({ theme }) => theme.colors.primary};
@@ -332,8 +334,8 @@ export const Key = styled.button`
     }
   }
   @media (max-width: 899px) {
-    width: 4rem;
-    height: 3rem;
+    width: 5rem;
+    height: 2.5rem;
     font-size: 1.5rem;
   }
 `;
@@ -451,7 +453,6 @@ export const TableRow = styled.tr<{ $animateEntry?: boolean }>`
     `}
 `;
 export const TableCell = styled.td<{ $palpite?: boolean }>`
-  padding: 0.1rem 0.5rem;
   text-align: center;
   color: ${({ $palpite, theme }) =>
     $palpite ? theme.colors.numberColor : theme.colors.black};

@@ -23,6 +23,7 @@ interface RodadaPainelProps {
   handleGuess: (guess: string[]) => void;
   setRodadaAberta: (rodada: number | null) => void;
   setHasFinished: (val: { win: boolean; tries: number } | null) => void;
+  roomId?: string;
 }
 
 const CustomRoomRodadaPainel: React.FC<RodadaPainelProps> = ({
@@ -35,8 +36,20 @@ const CustomRoomRodadaPainel: React.FC<RodadaPainelProps> = ({
   handleGuess,
   setRodadaAberta,
   setHasFinished,
+  roomId,
 }) => (
   <RodadaPainelContainer>
+    {(() => {
+      // Debug: loga o modo e o roomId sempre que renderiza
+
+      console.log(
+        "[CustomRoomRodadaPainel] modo:",
+        rodadaInfo.modo,
+        "roomId:",
+        roomId
+      );
+      return null;
+    })()}
     <div style={{ position: "relative" }}>
       <Game
         mode={rodadaInfo.modo as "casual" | "desafio" | "custom"}
@@ -48,6 +61,22 @@ const CustomRoomRodadaPainel: React.FC<RodadaPainelProps> = ({
         onGuess={handleGuess}
         maxTriesOverride={rodadaInfo.maxTries}
         onWin={() => {}}
+        backTo={(() => {
+          const path = roomId ? `/custom/game/${roomId}` : "/desafios";
+          console.log("[Game] backTo:", path);
+          return path;
+        })()}
+        onBack={
+          roomId
+            ? () => {
+                console.log(
+                  "[Game] onBack: navigating to",
+                  `/custom/game/${roomId}`
+                );
+                window.location.pathname = `/custom/game/${roomId}`;
+              }
+            : undefined
+        }
       />
       {hasFinished && (
         <RodadaPainelOverlay>

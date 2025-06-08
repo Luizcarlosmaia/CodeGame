@@ -32,8 +32,8 @@ export const GlobalStyles = createGlobalStyle`
   }
 
   body {
-    font-family: 'Inter', 'Montserrat', Arial, sans-serif;
-    background-color: ${({ theme }) => theme.colors.background};
+    font-family: 'JetBrains Mono', 'Fira Mono', 'IBM Plex Mono', 'Source Code Pro', 'Roboto Mono', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+    background-color: #f7f9fa;
     display: flex;
     align-items: center;
     justify-content: center;

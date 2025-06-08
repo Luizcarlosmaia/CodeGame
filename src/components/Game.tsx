@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { GuessRow } from "./GuessRow";
 import { generateCode } from "../utils/generateCode";
 import { generateDailyCode } from "../utils/generateDailyCode";
@@ -10,7 +11,6 @@ import {
   todayKey,
 } from "../utils/stats";
 import {
-  Title,
   DigitInput,
   SubmitButton,
   RestartButton,
@@ -29,7 +29,10 @@ import {
   Keypad,
   Key,
   ActionGroup,
+  ActiveIconButton,
 } from "../styles/AppStyles";
+import { BarChartIcon } from "lucide-react";
+import { StatsModal } from "./StatsModal";
 import { getFeedback } from "../utils/getFeedback";
 import {
   loadGameState,
@@ -40,9 +43,7 @@ import {
 interface GameProps {
   mode: Mode;
   onWin: (stats: Stats) => void;
-  // Força o código secreto apenas para testes automatizados
   __testCode?: string[];
-  // Props para modo controlado (custom)
   code?: string[];
   guesses?: string[][];
   hasWon?: boolean;
@@ -52,9 +53,10 @@ interface GameProps {
   onInputChange?: (val: string, idx: number) => void;
   onClear?: () => void;
   maxTriesOverride?: number;
+  onBack?: () => void; // Optional custom back handler
 }
 
-export const Game: React.FC<GameProps> = ({
+export const Game: React.FC<GameProps & { backTo?: string }> = ({
   mode,
   onWin,
   __testCode,
@@ -67,8 +69,12 @@ export const Game: React.FC<GameProps> = ({
   onInputChange,
   onClear,
   maxTriesOverride,
+  backTo,
+  onBack,
 }) => {
   const [shakeInput, setShakeInput] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const navigate = useNavigate();
   const today = todayKey();
 
   const dailyCasual = generateDailyCode(`${today}-casual`);
@@ -305,7 +311,64 @@ export const Game: React.FC<GameProps> = ({
     <PageWrapper>
       <Content>
         <Controls>
-          <Title>Code Game</Title>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 8,
+              alignItems: "center",
+              marginBottom: 4,
+            }}
+          >
+            <ActiveIconButton
+              onClick={() => {
+                if (onBack) {
+                  onBack();
+                } else {
+                  navigate(backTo ?? "/desafios");
+                }
+              }}
+              aria-label="Voltar"
+              style={{
+                background: "transparent",
+                border: "none",
+                fontSize: "1.7rem",
+                width: 44,
+                height: 44,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              title="Voltar"
+            >
+              <span
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 600,
+                  color: "inherit",
+                }}
+              >
+                ⟵
+              </span>
+            </ActiveIconButton>
+            <ActiveIconButton
+              onClick={() => setShowStats(true)}
+              aria-label="Ver estatísticas"
+              style={{
+                background: "transparent",
+                border: "none",
+                fontSize: "1.7rem",
+                width: 44,
+                height: 44,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              title="Estatísticas"
+            >
+              <BarChartIcon />
+            </ActiveIconButton>
+          </div>
           <Counter>
             Tentativa {hasWon || isLost ? guesses.length : guesses.length + 1}{" "}
             de {mode === "casual" ? 6 : mode === "desafio" ? 15 : "∞"}
@@ -324,11 +387,11 @@ export const Game: React.FC<GameProps> = ({
               background: "#e6f7ec",
               color: "#217a4b",
               borderRadius: 8,
-              fontSize: "1.04em",
+              fontSize: "1em",
               fontWeight: 600,
               boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
               minHeight: 0,
-              maxWidth: 320,
+              maxWidth: 350,
               marginLeft: "auto",
               marginRight: "auto",
               transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
@@ -337,7 +400,7 @@ export const Game: React.FC<GameProps> = ({
             <span style={{ fontSize: "1.5em", marginRight: 6, lineHeight: 1 }}>
               🎉
             </span>
-            <span>Parabéns! Você acertou o código!</span>
+            <span style={{ fontSize: "0.8rem" }}>Você acertou o código!</span>
           </div>
         )}
         {playedToday && result === "lose" && (
@@ -498,6 +561,22 @@ export const Game: React.FC<GameProps> = ({
             Enviar
           </SubmitButton>
         </div>
+        {/* Modal de estatísticas */}
+        {showStats && (
+          <StatsModal
+            stats={loadStats(mode)}
+            maxTries={
+              mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity
+            }
+            onClose={() => setShowStats(false)}
+            playedToday={(() => {
+              const stats = loadStats(mode);
+              return Array.isArray(stats?.distribution)
+                ? Object.values(stats?.distribution || {}).some((v) => v > 0)
+                : (stats?.totalGames ?? 0) > 0;
+            })()}
+          />
+        )}
       </Content>
     </PageWrapper>
   );

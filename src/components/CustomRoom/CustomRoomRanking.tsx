@@ -74,7 +74,6 @@ const CustomRoomRanking: React.FC<CustomRoomRankingProps> = ({
                   color: statusColor,
                   background: statusBg,
                   borderRadius: 8,
-                  padding: "2px 10px",
                   fontWeight: 700,
                   fontSize: 10,
                   marginLeft: 8,
@@ -109,7 +108,7 @@ const RankingItem = styled.li<{
   font-weight: ${({ $isFirst }) => ($isFirst ? 700 : 500)};
   color: ${({ $isUser, $isFirst }) =>
     $isUser ? "#388e3c" : $isFirst ? "#1976d2" : "#333"};
-  font-size: 15px;
+  font-size: 10px;
   background: ${({ $isUser }) => ($isUser ? "#eafbe7" : "none")};
   border-radius: ${({ $isUser }) => ($isUser ? 7 : 0)}px;
   display: flex;
@@ -120,32 +119,32 @@ const RankingItem = styled.li<{
 const RankingPos = styled.span`
   min-width: 28px;
   font-weight: 700;
-  @media (max-width: 480px) {
-    font-size: 13px;
+  @media (max-width: 800px) {
+    font-size: 9px;
   }
 `;
 
 const RankingName = styled.span`
   font-weight: 600;
-  @media (max-width: 480px) {
-    font-size: 13px;
+  @media (max-width: 800px) {
+    font-size: 9px;
   }
 `;
 
 const RankingPartidas = styled.span`
   color: #888;
-  font-size: 13px;
+  font-size: 10px;
   margin-left: 2px;
-  @media (max-width: 480px) {
-    font-size: 10px;
+  @media (max-width: 800px) {
+    font-size: 9px;
   }
 `;
 
 const RankingPontos = styled.span`
   margin-left: auto;
   font-weight: 700;
-  @media (max-width: 480px) {
-    font-size: 13px;
+  @media (max-width: 800px) {
+    font-size: 9px;
   }
 `;
 

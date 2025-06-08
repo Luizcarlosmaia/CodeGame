@@ -1,3 +1,78 @@
+it("não mostra alerta de permissão ao abandonar sala", async () => {
+  // Garante que o mock de useCustomRoom retorna user2 como membro
+  vi.spyOn(useCustomRoomModule, "useCustomRoom").mockReturnValue({
+    room: { ...baseRoom },
+    setRoom: vi.fn(),
+    loading: false,
+    error: null,
+    createRoom: vi.fn(),
+    joinRoom: mockJoinRoom,
+    leaveRoom: mockLeaveRoom,
+    deleteRoom: vi.fn(),
+  });
+  // Simula window.alert
+  const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+  window.confirm = vi.fn(() => true);
+  // user2 NÃO é o dono, então verá "Abandonar sala"
+  renderLobby({ userId: "user2", userName: "Participante" });
+  fireEvent.click(screen.getByText("Abandonar sala"));
+  // Aguarda leaveRoom ser chamado
+  await waitFor(() => {
+    expect(mockLeaveRoom).toHaveBeenCalledWith("sala123", "user2", true);
+  });
+  // Não deve mostrar alerta de permissão
+  expect(alertSpy).not.toHaveBeenCalledWith(
+    expect.stringContaining("Você não tem permissão para acessar esta sala")
+  );
+  alertSpy.mockRestore();
+});
+
+it("remove usuário da lista de membros para outros usuários", async () => {
+  // Simula um usuário diferente conectado
+  vi.spyOn(useCustomRoomModule, "useCustomRoom").mockReturnValue({
+    room: {
+      ...baseRoom,
+      membros: [
+        {
+          id: "user1",
+          nome: "Dono",
+          progresso: [],
+          terminouRodada: false,
+          tentativas: [],
+        },
+      ],
+    },
+    setRoom: vi.fn(),
+    loading: false,
+    error: null,
+    createRoom: vi.fn(),
+    joinRoom: mockJoinRoom,
+    leaveRoom: mockLeaveRoom,
+    deleteRoom: vi.fn(),
+  });
+  render(
+    <BrowserRouter>
+      <CustomRoomLobby roomId="sala123" userId="user1" userName="Dono" />
+    </BrowserRouter>
+  );
+  // Só o dono deve aparecer na lista de participantes (mas pode aparecer em outros lugares)
+  const participantes = screen.getAllByText("Dono");
+  // Deve aparecer pelo menos uma vez (na lista de participantes)
+  expect(participantes.length).toBeGreaterThan(0);
+  // Não deve aparecer "Participante" na lista
+  expect(screen.queryByText("Participante")).not.toBeInTheDocument();
+});
+
+it("redireciona corretamente ao abandonar sala", async () => {
+  window.confirm = vi.fn(() => true);
+  renderLobby({ userId: "user2", userName: "Participante" });
+  fireEvent.click(screen.getByText("Abandonar sala"));
+  await waitFor(() => {
+    expect(mockLeaveRoom).toHaveBeenCalled();
+  });
+  // Não é possível mockar window.location.assign em todos os ambientes, então só garantimos o fluxo principal
+});
+
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import CustomRoomLobby from "./CustomRoomLobby";
 import * as useCustomRoomModule from "../../hooks/useCustomRoom";
@@ -44,6 +119,20 @@ const baseRoom: CustomRoom = {
   criadaEm: "2024-01-01T00:00:00Z",
 };
 
+// Função utilitária deve vir antes dos testes
+function renderLobby(props = {}) {
+  return render(
+    <BrowserRouter>
+      <CustomRoomLobby
+        roomId="sala123"
+        userId="user2"
+        userName="Participante"
+        {...props}
+      />
+    </BrowserRouter>
+  );
+}
+
 describe("CustomRoomLobby", () => {
   beforeEach(() => {
     vi.spyOn(useCustomRoomModule, "useCustomRoom").mockReturnValue({
@@ -69,7 +158,6 @@ describe("CustomRoomLobby", () => {
           roomId="sala123"
           userId="user2"
           userName="Participante"
-          entryData={null}
           {...props}
         />
       </BrowserRouter>
@@ -77,9 +165,9 @@ describe("CustomRoomLobby", () => {
   }
 
   it("renderiza o nome da sala e botões principais", () => {
-    renderLobby();
+    renderLobby({ userId: "user2", userName: "Participante" });
     expect(screen.getByText("Sala Teste")).toBeInTheDocument();
-    expect(screen.getByText("Jogar rodada")).toBeInTheDocument();
+    expect(screen.getByText("Iniciar Jogo")).toBeInTheDocument();
     expect(screen.getByText("Abandonar sala")).toBeInTheDocument();
     expect(screen.getByTestId("custom-room-chat")).toBeInTheDocument();
   });
@@ -145,9 +233,11 @@ describe("CustomRoomLobby", () => {
       leaveRoom: mockLeaveRoom,
       deleteRoom: vi.fn(),
     });
-    renderLobby();
-    expect(
-      screen.getByText(/Adicionando você como membro/i)
-    ).toBeInTheDocument();
+    // user2 não está na lista de membros
+    renderLobby({ userId: "user2", userName: "Participante" });
+    // O componente não mostra mais "Adicionando você como membro" no lobby, então o teste deve ser removido ou ajustado conforme o novo fluxo.
+    // expect(screen.getByText(/Adicionando você como membro/i)).toBeInTheDocument();
+    // Para garantir que o usuário não está na lista de participantes:
+    expect(screen.queryByText("Participante")).not.toBeInTheDocument();
   });
 });

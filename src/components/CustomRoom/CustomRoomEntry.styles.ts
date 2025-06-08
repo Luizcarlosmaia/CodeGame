@@ -1,8 +1,32 @@
+import styled from "styled-components";
+export const EntryMainWrapper = styled.div`
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  display: flex;
+  gap: 80px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: 1rem 2rem;
+  justify-content: center;
+`;
+
+export const EntryFormCol = styled.div`
+  flex: 1;
+  min-width: 280px;
+  max-width: 400px;
+`;
+
+export const EntryListCol = styled.div`
+  flex: 1.2;
+  min-width: 320px;
+  max-width: 600px;
+`;
 export const EntryModoBadge = styled.span`
   background: none;
   color: #7a8ca3;
   font-weight: 400;
-  font-size: 0.93em;
+  font-size: 0.73em;
   border: 1px solid #e0e4ea;
   border-radius: 6px;
   padding: 0.2rem;
@@ -38,8 +62,6 @@ export const EntryErrorMsg = styled.div`
   font-weight: 500;
 `;
 import { css } from "styled-components";
-
-import styled from "styled-components";
 
 // Padrão consistente para CustomRoomEntry
 export const EntryTabs = styled.div`
@@ -156,7 +178,7 @@ export const EntryPermanentBtn = styled.button`
 export const EntryContainer = styled.div`
   width: 100%;
   max-width: 900px;
-  margin-top: 1.5rem;
+  margin-top: 4.5rem;
   margin-left: 0;
   margin-right: 0;
   padding: 1rem 2rem;

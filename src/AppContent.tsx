@@ -3,13 +3,17 @@ import React, { useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { loadStats, type Mode, type Stats } from "./utils/stats";
 import { Game } from "./components/Game";
-import { HelpModal } from "./components/HelpModal";
+import HelpPage from "./components/HelpModal";
+import DailyChallenges from "./pages/DailyChallenges";
 import { StatsModal } from "./components/StatsModal";
-import { Header } from "./components/Header";
+import Home from "./components/Home";
+import { MainMenu } from "./components/MainMenu";
 
 import styled from "styled-components";
 import CustomRoomFlow from "./components/CustomRoom/CustomRoomFlow";
 import CustomRoomGame from "./components/CustomRoom/CustomRoomGame";
+import CustomRoomCreatePage from "./pages/CustomRoomCreatePage";
+import CustomRoomJoinPage from "./pages/CustomRoomJoinPage";
 const CustomPageWrapper = styled.div`
   display: flex;
   flex-direction: column;
@@ -17,18 +21,13 @@ const CustomPageWrapper = styled.div`
   justify-content: flex-start;
   min-height: 90vh;
   width: 100%;
-  background: ${({ theme }) => theme.colors.background};
+  background: #f7f9fa;
   padding: 0.1rem;
   box-sizing: border-box;
   @media (max-width: 899px) {
     padding: 0.2rem;
   }
 `;
-
-interface Props {
-  isDark: boolean;
-  onToggleDark: () => void;
-}
 
 function isModeFinished(mode: Mode): boolean {
   if (mode !== "casual" && mode !== "desafio") return false;
@@ -49,12 +48,12 @@ function isModeFinished(mode: Mode): boolean {
   }
 }
 
-const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
+const AppContent: React.FC = () => {
   const location = useLocation();
   const mode = (location.pathname.replace("/", "") as Mode) || "casual";
 
-  const [showHelp, setShowHelp] = useState(false);
-  const [helpTutorial, setHelpTutorial] = useState(false);
+  // const [showHelp, setShowHelp] = useState(false);
+  // const [helpTutorial, setHelpTutorial] = useState(false);
   // Sempre força a checagem ao montar (corrige bug de não mostrar ao recarregar)
   const [showStats, setShowStats] = useState(false);
   const [statsByMode, setStatsByMode] = useState<Record<Mode, Stats>>({
@@ -100,21 +99,7 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
 
   return (
     <>
-      <Header
-        mode={mode}
-        onModeChange={() => {}}
-        onShowStats={() => setShowStats(true)}
-        onShowHelp={() => {
-          setShowHelp(true);
-          setHelpTutorial(false);
-        }}
-        isDark={isDark}
-        onToggleDark={onToggleDark}
-      />
-
-      {showHelp && (
-        <HelpModal onClose={() => setShowHelp(false)} tutorial={helpTutorial} />
-      )}
+      <MainMenu />
       {showStats && (
         <StatsModal
           stats={statsByMode[mode]}
@@ -132,7 +117,10 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
       )}
 
       <Routes>
-        <Route path="/" element={<Navigate to="/casual" replace />} />
+        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/home" element={<Home />} />
+        <Route path="/ajuda" element={<HelpPage />} />
+        <Route path="/desafios" element={<DailyChallenges />} />
         <Route
           path="/casual"
           element={<Game mode="casual" onWin={handleWin} />}
@@ -141,7 +129,25 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
           path="/desafio"
           element={<Game mode="desafio" onWin={handleWin} />}
         />
-        {/* Rota custom com fluxo de criar/entrar/lobby */}
+        {/* Página dedicada para criar sala customizada */}
+        <Route
+          path="/custom/criar"
+          element={
+            <CustomPageWrapper>
+              <CustomRoomCreatePage />
+            </CustomPageWrapper>
+          }
+        />
+        {/* Página dedicada para entrar/listar salas customizadas */}
+        <Route
+          path="/custom/entrar"
+          element={
+            <CustomPageWrapper>
+              <CustomRoomJoinPage />
+            </CustomPageWrapper>
+          }
+        />
+        {/* Rota custom com fluxo de entrar/lobby/listar */}
         <Route
           path="/custom"
           element={
@@ -164,7 +170,6 @@ const AppContent: React.FC<Props> = ({ isDark, onToggleDark }) => {
           path="/custom/game/:roomId"
           element={
             <CustomPageWrapper>
-              {/* TODO: passar userId/userName se necessário */}
               <CustomRoomGame />
             </CustomPageWrapper>
           }

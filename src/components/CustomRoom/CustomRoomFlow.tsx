@@ -6,6 +6,7 @@ import CustomRoomEntry from "./CustomRoomEntry";
 import { useLocation } from "react-router-dom";
 import CustomRoomLobby from "./CustomRoomLobby";
 import { useCustomRoom } from "../../hooks/useCustomRoom";
+import { generateRoomId } from "../../utils/generateRoomId";
 
 // Componente "flow" para alternar entre criar/entrar e o lobby
 const CustomRoomFlow: React.FC = () => {
@@ -39,23 +40,20 @@ const CustomRoomFlow: React.FC = () => {
     }
   }, [roomId]);
 
-  // Guarda as configs da sala criada (nome, modos, rodadas)
-
-  // Pronto para outros tipos no futuro, mas só "permanente" por enquanto
-  // Pronto para outros tipos no futuro, mas só "permanente" por enquanto
   type EntryData = {
     nome: string;
     modos: { modo: string; rodadas: number }[];
     type: "permanente";
   };
-  const [entryData, setEntryData] = useState<EntryData | null>(null);
+  const [, setEntryData] = useState<EntryData | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Criação real da sala no Firestore
   const { createRoom } = useCustomRoom();
   const handleCreate = async (data: EntryData) => {
     setCreating(true);
-    const newRoomId = `sala-${Math.random().toString(36).slice(2, 8)}`;
+    // Gera um código aleatório de 10 caracteres (letras e números, sem prefixo "sala-")
+    const newRoomId = generateRoomId();
     // Sempre gera e salva o userId específico da sala permanente
     const thisUserId = `user-${Math.random().toString(36).slice(2, 8)}`;
     const thisUserName =
@@ -161,6 +159,10 @@ const CustomRoomFlow: React.FC = () => {
     window.location.href = `/custom/lobby/${id}`;
   };
   const location = useLocation();
+  // Se estiver na rota /custom/criar, não renderiza nada (deixa o AppContent cuidar)
+  if (location.pathname === "/custom/criar") {
+    return null;
+  }
   if (!roomId) {
     // Mostra loading amigável durante a criação da sala
     return (
@@ -172,15 +174,8 @@ const CustomRoomFlow: React.FC = () => {
       />
     );
   }
-
-  // Se criou ou acessou via URL, passa configs para o lobby
   return (
-    <CustomRoomLobby
-      roomId={roomId}
-      userId={userId}
-      userName={userName}
-      entryData={entryData}
-    />
+    <CustomRoomLobby roomId={roomId} userId={userId} userName={userName} />
   );
 };
 
