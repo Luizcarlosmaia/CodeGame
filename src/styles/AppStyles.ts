@@ -139,7 +139,7 @@ export const Content = styled.div`
   overflow-y: auto;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 1rem 5rem;
+  padding: 0 3rem 2rem 3rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -149,7 +149,7 @@ export const Content = styled.div`
     max-width: 900px;
     border-radius: 28px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.13);
-    padding: 0.7rem 5rem;
+    padding: 0 5rem;
     gap: 0.6rem;
   }
 `;
@@ -157,7 +157,6 @@ export const Controls = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
 `;
 export const InputArea = styled.div<{ shake?: boolean }>`
   display: flex;

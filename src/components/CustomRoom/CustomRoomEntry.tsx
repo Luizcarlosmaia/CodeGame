@@ -205,7 +205,7 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
         </EntryFormCol>
         <EntryListCol>
           <Section>
-            <Label>Salas que já sou membro</Label>
+            <Label>Salas que já sou membro:</Label>
             {loadingPermanent && <div>Carregando...</div>}
             {!loadingPermanent && permanentRooms.length === 0 && (
               <div>Nenhuma sala permanente disponível.</div>

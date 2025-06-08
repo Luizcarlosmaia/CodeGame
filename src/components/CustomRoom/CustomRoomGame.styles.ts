@@ -235,11 +235,11 @@ export const Card = styled.div`
   box-shadow: 0 2px 12px rgba(25, 118, 210, 0.08);
   padding: 1rem;
   width: 100%;
-  min-height: 900px;
+  min-height: 500px;
+  max-height: 2500px;
   display: flex;
   flex-direction: column;
   align-items: center;
-
   max-width: 1100px;
   margin: 10px 0 10px 0;
   @media (max-width: 899px) {

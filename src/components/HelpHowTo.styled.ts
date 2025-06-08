@@ -8,7 +8,7 @@ export const HowToWrapper = styled.div`
   align-items: center;
   padding: 4.5rem 0 0 0;
   @media (max-width: 900px) {
-    min-height: 90vh;
+    min-height: 100vh;
   }
 `;
 
@@ -16,7 +16,7 @@ export const HowToTitle = styled.h1`
   font-size: 3rem;
   font-weight: 800;
   color: #181c24;
-  margin-bottom: 2.5rem;
+  margin-bottom: 0.5rem;
   text-align: center;
   @media (max-width: 900px) {
     font-size: 1.5rem;
