@@ -11,14 +11,11 @@ import {
   todayKey,
 } from "../utils/stats";
 import {
-  DigitInput,
   SubmitButton,
-  RestartButton,
   Counter,
   PageWrapper,
   Content,
   Controls,
-  InputArea,
   GuessTable,
   TableHead,
   TableHeader,
@@ -28,9 +25,10 @@ import {
   Badge,
   Keypad,
   Key,
-  ActionGroup,
   ActiveIconButton,
 } from "../styles/AppStyles";
+import { ActiveInputRow } from "./ActiveInputRow";
+import { CodigoMestreInputRow } from "./CodigoMestreInputRow";
 import { BarChartIcon } from "lucide-react";
 import { StatsModal } from "./StatsModal";
 import { getFeedback } from "../utils/getFeedback";
@@ -67,7 +65,6 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
   setInputDigits: setInputDigitsProp,
   onGuess,
   onInputChange,
-  onClear,
   maxTriesOverride,
   backTo,
   onBack,
@@ -79,6 +76,10 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
 
   const dailyCasual = generateDailyCode(`${today}-casual`);
   const dailyDesafio = generateDailyCode(`${today}-desafio`);
+  const dailyCodigoMestre = generateDailyCode(
+    `${today}-codigo-mestre`,
+    "codigo-mestre"
+  );
 
   // Estado local só para modos não-controlados (casual/desafio)
   const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() => {
@@ -101,21 +102,30 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
         hasWon: false,
         date: today,
       },
-    };
-    return (["casual", "desafio", "custom"] as Mode[]).reduce((acc, m) => {
-      const saved = loadGameState(m);
-      const isToday = saved.date === today;
-      acc[m] = {
-        code:
-          Array.isArray(saved.code) && saved.code.length === 4 && isToday
-            ? saved.code
-            : fallback[m].code,
-        guesses: isToday ? saved.guesses : [],
-        hasWon: isToday ? saved.hasWon : false,
+      "codigo-mestre": {
+        code: __testCode || dailyCodigoMestre,
+        guesses: [],
+        hasWon: false,
         date: today,
-      };
-      return acc;
-    }, {} as Record<Mode, SavedMode>);
+      },
+    };
+    return (["casual", "desafio", "custom", "codigo-mestre"] as Mode[]).reduce(
+      (acc, m) => {
+        const saved = loadGameState(m);
+        const isToday = saved.date === today;
+        acc[m] = {
+          code:
+            Array.isArray(saved.code) && saved.code.length === 4 && isToday
+              ? saved.code
+              : fallback[m].code,
+          guesses: isToday ? saved.guesses : [],
+          hasWon: isToday ? saved.hasWon : false,
+          date: today,
+        };
+        return acc;
+      },
+      {} as Record<Mode, SavedMode>
+    );
   });
 
   const [animateRow, setAnimateRow] = useState<null | {
@@ -139,12 +149,11 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
   }, [mode, gameState, codeProp, guessesProp, hasWonProp]);
 
   // Input controlado ou não
-  const [inputDigitsState, setInputDigitsState] = useState<string[]>([
-    "",
-    "",
-    "",
-    "",
-  ]);
+  // Para codigo-mestre: 4 campos de 0 a 99
+  const isCodigoMestre = mode === "codigo-mestre";
+  const [inputDigitsState, setInputDigitsState] = useState<string[]>(
+    Array(4).fill("")
+  );
   const inputDigits = inputDigitsProp ?? inputDigitsState;
   const setInputDigits = setInputDigitsProp ?? setInputDigitsState;
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -162,15 +171,30 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
   const isLost = !hasWon && guesses.length >= maxTries;
 
   const handleChange = (val: string, idx: number) => {
-    if (!/^[0-9]?$/.test(val) || hasWon || isLost) return;
+    if (hasWon || isLost) return;
+    let valid = false;
+    let newVal = val;
+    if (isCodigoMestre) {
+      // Permite 0-99, aceita até 2 dígitos, não limpa zeros à esquerda para permitir digitação fluida
+      if (/^\d{0,2}$/.test(val)) {
+        if (val === "" || (parseInt(val, 10) >= 0 && parseInt(val, 10) <= 99)) {
+          valid = true;
+          // NÃO normaliza para string sem zeros à esquerda aqui!
+          newVal = val;
+        }
+      }
+    } else {
+      if (/^[0-9]?$/.test(val)) valid = true;
+    }
+    if (!valid) return;
     if (onInputChange) {
-      onInputChange(val, idx);
+      onInputChange(newVal, idx);
       return;
     }
     const next = [...inputDigits];
-    next[idx] = val;
+    next[idx] = newVal;
     setInputDigits(next);
-    if (val && idx < 3) focusField(idx + 1);
+    if (newVal && idx < 3) focusField(idx + 1);
   };
 
   const handleGuess = () => {
@@ -183,14 +207,37 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     }
     if (guesses.length >= maxTries) return;
 
+    // Para codigo-mestre, garantir que todos os campos são números válidos 0-99
+    if (
+      isCodigoMestre &&
+      inputDigits.some(
+        (d) => isNaN(Number(d)) || Number(d) < 0 || Number(d) > 99
+      )
+    ) {
+      setShakeInput(false);
+      setTimeout(() => setShakeInput(true), 10);
+      setTimeout(() => setShakeInput(false), 350);
+      return;
+    }
+
     if (onGuess) {
       onGuess([...inputDigits]);
-      setInputDigits(["", "", "", ""]);
+      setInputDigits(Array(4).fill(""));
       focusField();
       return;
     }
 
-    const isCorrect = inputDigits.join("") === secretCode.join("");
+    // Para codigo-mestre, comparar como string normalizada
+    let isCorrect = false;
+    if (isCodigoMestre) {
+      isCorrect = inputDigits.every((d, i) => {
+        const codeVal = secretCode[i];
+        // Normaliza para string sem zeros à esquerda
+        return String(Number(d)) === String(Number(codeVal));
+      });
+    } else {
+      isCorrect = inputDigits.join("") === secretCode.join("");
+    }
     const nextGuesses = [...guesses, [...inputDigits]];
 
     setGameState((prev) => ({
@@ -203,7 +250,7 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
       },
     }));
 
-    setInputDigits(["", "", "", ""]);
+    setInputDigits(Array(4).fill(""));
     focusField();
 
     const ENTRY_ANIMATION = 500;
@@ -256,40 +303,6 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     }, ENTRY_ANIMATION);
   };
 
-  const handleClear = () => {
-    if (onClear) {
-      onClear();
-      setInputDigits(["", "", "", ""]);
-      focusField();
-      return;
-    }
-    setGameState((prev) => ({
-      ...prev,
-      custom: {
-        ...prev.custom!,
-        guesses: [],
-        hasWon: false,
-        date: today,
-      },
-    }));
-    setInputDigits(["", "", "", ""]);
-    focusField();
-  };
-  const handleRestart = () => {
-    setGameState((prev) => ({
-      ...prev,
-      custom: {
-        ...prev.custom!,
-        code: generateCode(),
-        date: today,
-      },
-    }));
-    handleClear();
-  };
-
-  // const keypad = [7, 8, 9, 4, 5, 6, 1, 2, 3, 0, "⌫"] as const;
-
-  // --- Mensagem de vitória/derrota (mesma lógica do StatsModal) ---
   let result: "win" | "lose" | null = null;
   let playedToday = false;
   if (mode === "casual" || mode === "desafio") {
@@ -431,88 +444,96 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
           </div>
         )}
 
-        <InputArea as="div" shake={shakeInput}>
-          {inputDigits.map((digit, i) => (
-            <DigitInput
-              key={i}
-              value={digit}
-              onChange={(e) => handleChange(e.target.value, i)}
-              maxLength={1}
-              ref={(el) => {
-                inputRefs.current[i] = el;
-              }}
-              disabled={hasWon || isLost}
-              readOnly
-              inputMode="none"
-            />
-          ))}
-        </InputArea>
-        {mode === "custom" && (
-          <ActionGroup>
-            <RestartButton onClick={handleClear}>Resetar Rodada</RestartButton>
-            <RestartButton onClick={handleRestart}>Novo Jogo</RestartButton>
-          </ActionGroup>
+        {/* Inputs grandes, setas e sem histórico apenas no modo codigo-mestre */}
+        {mode === "codigo-mestre" ? (
+          <CodigoMestreInputRow
+            inputDigits={inputDigits}
+            secretCode={secretCode}
+            onChange={handleChange}
+            inputRefs={inputRefs}
+            hasWon={hasWon}
+            isLost={isLost}
+            guessesLength={guesses.length}
+            shakeInput={shakeInput}
+          />
+        ) : (
+          <ActiveInputRow
+            inputDigits={inputDigits}
+            secretCode={secretCode}
+            isCodigoMestre={isCodigoMestre}
+            onChange={handleChange}
+            inputRefs={inputRefs}
+            hasWon={hasWon}
+            isLost={isLost}
+            guessesLength={guesses.length}
+            modoVisual={false}
+            shakeInput={shakeInput}
+          />
         )}
-
-        {mode === "casual" &&
-          Array.from({ length: 6 }).map((_, i) => {
-            const g = guesses[i] ?? ["", "", "", ""];
-            const animateEntry = entryRow === i && g.some((d) => d !== "");
-            return (
-              <GuessRow
-                key={i}
-                guess={g}
-                code={secretCode}
-                mode={mode}
-                attempt={i + 1}
-                animate={animateRow?.idx === i}
-                animationType={animateRow?.type}
-                animateEntry={animateEntry}
-                staggerEntry={true}
-              />
-            );
-          })}
-        {mode === "desafio" && (
+        {/* No modo codigo-mestre, não renderiza GuessRow nem histórico */}
+        {mode !== "codigo-mestre" && (
           <>
-            <GuessTable>
-              <TableHead>
-                <tr>
-                  <TableHeader>#</TableHeader>
-                  <TableHeader>Palpite</TableHeader>
-                  <TableHeader>Certos</TableHeader>
-                  <TableHeader>Presentes</TableHeader>
-                </tr>
-              </TableHead>
-              <TableBody>
-                {Array.from({ length: 15 }).map((_, i) => {
-                  const g = guesses[i] ?? ["", "", "", ""];
-                  const isFilled = i < guesses.length;
-                  const { correctPlace, correctDigit } = isFilled
-                    ? getFeedback(g, secretCode)
-                    : { correctPlace: "-", correctDigit: "-" };
-                  return (
-                    <TableRow
-                      key={i}
-                      $animateEntry={isFilled}
-                      style={{
-                        background: isFilled ? undefined : "#f5f5f5",
-                        color: isFilled ? undefined : "#bbb",
-                        opacity: isFilled ? 1 : 0.7,
-                      }}
-                    >
-                      <TableCell>{i + 1}</TableCell>
-                      <TableCell $palpite>{g.join(" ")}</TableCell>
-                      <TableCell>
-                        <Badge variant="success">{correctPlace}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="warning">{correctDigit}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </GuessTable>
+            {mode === "casual" &&
+              Array.from({ length: maxTries }).map((_, i) => {
+                const g = guesses[i] ?? ["", "", "", ""];
+                const animateEntry = entryRow === i && g.some((d) => d !== "");
+                return (
+                  <GuessRow
+                    key={i}
+                    guess={g}
+                    code={secretCode}
+                    mode={mode}
+                    attempt={i + 1}
+                    animate={animateRow?.idx === i}
+                    animationType={animateRow?.type}
+                    animateEntry={animateEntry}
+                    staggerEntry={true}
+                  />
+                );
+              })}
+            {mode === "desafio" && (
+              <>
+                <GuessTable>
+                  <TableHead>
+                    <tr>
+                      <TableHeader>#</TableHeader>
+                      <TableHeader>Palpite</TableHeader>
+                      <TableHeader>Certos</TableHeader>
+                      <TableHeader>Presentes</TableHeader>
+                    </tr>
+                  </TableHead>
+                  <TableBody>
+                    {Array.from({ length: 15 }).map((_, i) => {
+                      const g = guesses[i] ?? ["", "", "", ""];
+                      const isFilled = i < guesses.length;
+                      const { correctPlace, correctDigit } = isFilled
+                        ? getFeedback(g, secretCode)
+                        : { correctPlace: "-", correctDigit: "-" };
+                      return (
+                        <TableRow
+                          key={i}
+                          $animateEntry={isFilled}
+                          style={{
+                            background: isFilled ? undefined : "#f5f5f5",
+                            color: isFilled ? undefined : "#bbb",
+                            opacity: isFilled ? 1 : 0.7,
+                          }}
+                        >
+                          <TableCell>{i + 1}</TableCell>
+                          <TableCell $palpite>{g.join(" ")}</TableCell>
+                          <TableCell>
+                            <Badge variant="success">{correctPlace}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="warning">{correctDigit}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </GuessTable>
+              </>
+            )}
           </>
         )}
         <div
@@ -525,8 +546,23 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
                 disabled={hasWon || isLost}
                 onClick={() => {
                   if (hasWon || isLost) return;
-                  const idx = inputDigits.indexOf("");
-                  if (idx >= 0) handleChange(String(k), idx);
+                  if (mode === "codigo-mestre") {
+                    // Usa o campo focado, se existir, senão o primeiro incompleto
+                    let idx = (
+                      window as unknown as { codigoMestreFocus?: number }
+                    ).codigoMestreFocus;
+                    if (typeof idx !== "number" || idx < 0 || idx > 3) {
+                      idx = inputDigits.findIndex((d) => d.length < 2);
+                      if (idx === -1) idx = 0;
+                    }
+                    const current = inputDigits[idx] || "";
+                    if (current.length < 2) {
+                      handleChange(current + String(k), idx);
+                    }
+                  } else {
+                    const idx = inputDigits.indexOf("");
+                    if (idx >= 0) handleChange(String(k), idx);
+                  }
                 }}
               >
                 {k}
@@ -536,11 +572,27 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
               disabled={hasWon || isLost}
               onClick={() => {
                 if (hasWon || isLost) return;
-                const last = inputDigits
-                  .map((d, j) => (d ? j : -1))
-                  .filter((j) => j >= 0)
-                  .pop();
-                if (last != null) handleChange("", last);
+                if (mode === "codigo-mestre") {
+                  let idx = (
+                    window as unknown as { codigoMestreFocus?: number }
+                  ).codigoMestreFocus;
+                  if (typeof idx !== "number" || idx < 0 || idx > 3) {
+                    idx = inputDigits.findIndex((d) => d.length < 2);
+                    if (idx === -1) idx = 3;
+                  }
+                  const current = inputDigits[idx] || "";
+                  if (current.length > 0) {
+                    handleChange(current.slice(0, -1), idx);
+                  } else if (idx > 0) {
+                    handleChange("", idx - 1);
+                  }
+                } else {
+                  const last = inputDigits
+                    .map((d, j) => (d ? j : -1))
+                    .filter((j) => j >= 0)
+                    .pop();
+                  if (last != null) handleChange("", last);
+                }
               }}
             >
               ⌫

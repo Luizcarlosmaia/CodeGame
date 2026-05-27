@@ -2,7 +2,7 @@
 
 const STORAGE_KEY = "codeGameState";
 
-export type Mode = "casual" | "desafio" | "custom";
+export type Mode = "casual" | "desafio" | "custom" | "codigo-mestre";
 
 export interface SavedMode {
   code: string[]; // array de 4 dígitos do código atual

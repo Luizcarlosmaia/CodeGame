@@ -5,6 +5,8 @@ import casualIcon from "../img/casual-icone.png";
 import desafioIcon from "../img/desafio-icone.png";
 import casualIconMobile from "../img/casual-icone-mobile.png";
 import desafioIconMobile from "../img/desafio-icone-mobile.png";
+import codigoMestreIcon from "../img/codigo-mestre-icone.png";
+import codigoMestreIconMobile from "../img/codigo-mestre-icone-mobile.png";
 
 const Wrapper = styled.div`
   max-width: 900px;
@@ -139,6 +141,16 @@ const DailyChallenges: React.FC = () => {
           <OptionLabel $dark={isMobile}>
             Desafio{isMobile && " - Modo Difícil"}
           </OptionLabel>
+        </OptionCard>
+        <OptionCard
+          onClick={() => navigate("/codigo-mestre")}
+          $highlight={false}
+        >
+          <OptionImage
+            src={isMobile ? codigoMestreIconMobile : codigoMestreIcon}
+            alt="Código Mestre"
+          />
+          <OptionLabel $dark={true}>Código Mestre</OptionLabel>
         </OptionCard>
       </Options>
     </Wrapper>

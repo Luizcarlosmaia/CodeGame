@@ -170,6 +170,7 @@ export const MainMenu: React.FC = () => {
               Desafios Diários
             </MenuLink>
           </li>
+
           <li>
             <MenuLink
               to="/custom/criar"

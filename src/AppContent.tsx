@@ -30,9 +30,14 @@ const CustomPageWrapper = styled.div`
 `;
 
 function isModeFinished(mode: Mode): boolean {
-  if (mode !== "casual" && mode !== "desafio") return false;
+  // Adapta para considerar "codigo-mestre" e tentativas específicas
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const maxTries = mode === "casual" ? 6 : 15;
+  let maxTries = 6;
+  if (mode === "desafio") maxTries = 15;
+  else if (mode === "codigo-mestre") maxTries = 7;
+  else if (mode === "custom") maxTries = Infinity;
+  if (mode !== "casual" && mode !== "desafio" && mode !== "codigo-mestre")
+    return false;
   try {
     const gameState = JSON.parse(
       localStorage.getItem(`codeGameState-${mode}`) || "{}"
@@ -60,6 +65,7 @@ const AppContent: React.FC = () => {
     casual: loadStats("casual"),
     desafio: loadStats("desafio"),
     custom: loadStats("custom"),
+    "codigo-mestre": loadStats("codigo-mestre"),
   });
 
   const handleWin = (newStats: Stats) => {
@@ -128,6 +134,12 @@ const AppContent: React.FC = () => {
         <Route
           path="/desafio"
           element={<Game mode="desafio" onWin={handleWin} />}
+        />
+        <Route
+          path="/codigo-mestre"
+          element={
+            <Game mode="codigo-mestre" onWin={handleWin} maxTriesOverride={7} />
+          }
         />
         {/* Página dedicada para criar sala customizada */}
         <Route

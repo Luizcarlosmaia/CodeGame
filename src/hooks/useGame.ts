@@ -21,6 +21,7 @@ export function useGame(mode: Mode, onWin: (stats: Stats) => void) {
     const casual = loadGameState("casual");
     const desafio = loadGameState("desafio");
     let custom = loadGameState("custom");
+    let codigoMestre = loadGameState("codigo-mestre");
     // Garante que o modo custom sempre tenha um código válido
     if (
       !custom ||
@@ -35,7 +36,21 @@ export function useGame(mode: Mode, onWin: (stats: Stats) => void) {
         date: todayKey(),
       };
     }
-    return { casual, desafio, custom };
+    // Garante que o modo codigo-mestre sempre tenha um código válido
+    if (
+      !codigoMestre ||
+      !Array.isArray(codigoMestre.code) ||
+      codigoMestre.code.length !== 4 ||
+      codigoMestre.code.some((d) => typeof d !== "string" || d.length === 0)
+    ) {
+      codigoMestre = {
+        code: ["", "", "", ""],
+        guesses: [],
+        hasWon: false,
+        date: todayKey(),
+      };
+    }
+    return { casual, desafio, custom, "codigo-mestre": codigoMestre };
   });
 
   // --- 2) reset diário (corrigido: observa mudança de dia em tempo real) ---
@@ -47,6 +62,7 @@ export function useGame(mode: Mode, onWin: (stats: Stats) => void) {
         todayRef.current = today;
         const daily = generateDailyCode(today);
         setGameState((prev) => ({
+          ...prev,
           casual: {
             ...prev.casual,
             code: daily,
@@ -63,6 +79,13 @@ export function useGame(mode: Mode, onWin: (stats: Stats) => void) {
           },
           custom: {
             ...prev.custom,
+            code: generateCode(),
+            guesses: [],
+            hasWon: false,
+            date: today,
+          },
+          ["codigo-mestre"]: {
+            ...prev["codigo-mestre"],
             code: generateCode(),
             guesses: [],
             hasWon: false,

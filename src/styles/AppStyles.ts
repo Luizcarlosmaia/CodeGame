@@ -241,6 +241,9 @@ export const DigitInput = styled.input`
     height: 3rem;
     font-size: 2.5rem;
   }
+  &.shake {
+    animation: 0.3s ${shakeAnim};
+  }
 `;
 export const SubmitButton = styled.button`
   background-color: ${({ theme }) => theme.colors.primary};

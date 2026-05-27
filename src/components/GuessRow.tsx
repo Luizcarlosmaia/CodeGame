@@ -36,33 +36,33 @@ export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
   // placeholder: nenhum dígito ainda
   const isPlaceholder = guess.every((d) => d === "");
 
-  if (mode === "casual") {
+  // Visual para modos com feedback por campo (casual, codigo-mestre)
+  if (mode === "casual" || mode === "codigo-mestre") {
     if (isPlaceholder) {
       return (
         <GuessRowContainer>
           {[0, 1, 2, 3].map((i) => (
-            <GuessDigit
-              key={i}
-              color="#dee2e6" // igual ao theme.colors.gray no tema claro
-              textColor="#6c757d" // igual ao theme.colors.grayText no tema claro
-              // No dark, GuessDigit já usa cor do tema, então não precisa forçar via style
-            >
+            <GuessDigit key={i} color="#dee2e6" textColor="#6c757d">
               &nbsp;
             </GuessDigit>
           ))}
         </GuessRowContainer>
       );
     }
-    const statuses = getStatuses(guess, code);
-
+    // Para codigo-mestre, normaliza comparação (0-99)
+    const normGuess =
+      mode === "codigo-mestre" ? guess.map((d) => String(Number(d))) : guess;
+    const normCode =
+      mode === "codigo-mestre" ? code.map((d) => String(Number(d))) : code;
+    const statuses = getStatuses(normGuess, normCode);
     const STAGGER = 80; // ms
     return (
       <GuessRowContainer $animateEntry={animateEntry}>
         {guess.map((digit, idx) => {
           let bg = "#dee2e6";
-          if (statuses[idx] === "correct") bg = "#28a745";
-          else if (statuses[idx] === "present") bg = "#ffc107";
-
+          const status = statuses[idx];
+          if (status === "correct") bg = "#28a745";
+          else if (status === "present") bg = "#ffc107";
           return (
             <GuessDigit
               key={idx}
@@ -71,6 +71,7 @@ export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
               $animationType={animationType}
               $animateEntry={animateEntry}
               $entryDelay={animateEntry && staggerEntry ? idx * STAGGER : 0}
+              data-status={status}
             >
               {digit}
             </GuessDigit>
@@ -79,6 +80,7 @@ export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
       </GuessRowContainer>
     );
   }
+  // Modo desafio (hard): feedback resumido
   const { correctPlace, correctDigit } = getFeedback(guess, code);
   return (
     <HardModeText>

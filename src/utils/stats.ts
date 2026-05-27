@@ -1,4 +1,4 @@
-export type Mode = "casual" | "desafio" | "custom";
+export type Mode = "casual" | "desafio" | "custom" | "codigo-mestre";
 
 function statsKey(mode: "casual" | "desafio"): string {
   return `codeGameStats-${mode}`;
@@ -35,7 +35,7 @@ const defaultStats = (): Stats => ({
 });
 
 export function loadStats(mode: Mode): Stats {
-  if (mode === "custom") {
+  if (mode === "custom" || mode === "codigo-mestre") {
     return defaultStats();
   }
   try {
@@ -82,18 +82,18 @@ function daysBetween(date1: Date, date2: Date): number {
 }
 
 export function saveStats(mode: Mode, stats: Stats) {
-  if (mode === "custom") {
+  if (mode === "custom" || mode === "codigo-mestre") {
     return defaultStats();
   }
   localStorage.setItem(statsKey(mode), JSON.stringify(stats));
 }
 
 export function hasSeenStats(mode: Mode, dateKey: string): boolean {
-  if (mode === "custom") return false;
+  if (mode === "custom" || mode === "codigo-mestre") return false;
   return localStorage.getItem(seenKey(mode, dateKey)) === "1";
 }
 
 export function markStatsSeen(mode: Mode, dateKey: string): void {
-  if (mode === "custom") return;
+  if (mode === "custom" || mode === "codigo-mestre") return;
   localStorage.setItem(seenKey(mode, dateKey), "1");
 }
