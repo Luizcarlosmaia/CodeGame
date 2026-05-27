@@ -45,6 +45,7 @@ export interface CustomRoom {
   admins: string[];
   membros: RoomPlayer[];
   modo: RoomMode;
+  modos?: { modo: string; rodadas: number }[];
   rodadaAtual: number;
   rodadas: RoomRound[];
   ranking: RoomRanking[];

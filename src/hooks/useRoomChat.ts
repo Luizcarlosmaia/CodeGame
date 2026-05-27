@@ -1,13 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { db } from "../firebase";
-import {
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  Timestamp,
-} from "firebase/firestore";
+import { roomsApi } from "../api/roomsApi";
 
 export interface RoomMessage {
   id?: string;
@@ -17,74 +9,66 @@ export interface RoomMessage {
   createdAt: Date;
 }
 
+const POLL_INTERVAL_MS = 2000;
+
 export function useRoomChat(roomId: string | undefined) {
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Buscar mensagens em tempo real
   useEffect(() => {
     if (!roomId) return;
+
+    let cancelled = false;
     setLoading(true);
-    const q = query(
-      collection(db, "rooms", roomId, "chat"),
-      orderBy("createdAt", "asc")
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setMessages(
-          snap.docs.map((doc) => {
-            const data = doc.data();
-            let createdAt: Date;
-            if (data.createdAt instanceof Timestamp) {
-              createdAt = data.createdAt.toDate();
-            } else if (
-              typeof data.createdAt === "string" ||
-              typeof data.createdAt === "number"
-            ) {
-              createdAt = new Date(data.createdAt);
-            } else {
-              createdAt = new Date(); // fallback para data atual se ausente ou inválido
-            }
-            return {
-              id: doc.id,
-              userId: data.userId,
-              userName: data.userName,
-              text: data.text,
-              createdAt,
-            } as RoomMessage;
-          })
-        );
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
+
+    const fetchMessages = async () => {
+      try {
+        const data = await roomsApi.getChatMessages(roomId);
+        if (!cancelled) {
+          setMessages(
+            data.map((message) => ({
+              id: message.id,
+              userId: message.userId,
+              userName: message.userName,
+              text: message.text,
+              createdAt: new Date(message.createdAt),
+            }))
+          );
+          setError(null);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Erro ao buscar mensagens");
+          setLoading(false);
+        }
       }
-    );
-    return () => unsub();
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [roomId]);
 
-  // Enviar mensagem
   const sendMessage = useCallback(
     async (userId: string, userName: string, text: string) => {
       if (!roomId) return;
+
       setLoading(true);
       try {
-        await addDoc(collection(db, "rooms", roomId, "chat"), {
-          userId,
-          userName,
-          text,
-          createdAt: Timestamp.now(),
-        });
+        await roomsApi.sendChatMessage(roomId, { userId, userName, text });
         setLoading(false);
-      } catch (e) {
-        if (e instanceof Error) {
-          setError(e.message);
-        } else {
-          setError("Erro desconhecido ao enviar mensagem.");
-        }
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Erro desconhecido ao enviar mensagem."
+        );
         setLoading(false);
       }
     },

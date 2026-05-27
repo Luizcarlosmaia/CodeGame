@@ -1,144 +1,146 @@
 import { useEffect, useState, useCallback } from "react";
-import { db } from "../firebase";
-import { doc, getDoc, setDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { roomsApi } from "../api/roomsApi";
 import type { CustomRoom, RoomPlayer } from "../types/customRoom";
 
-// Hook para manipular sala custom no Firestore
+const POLL_INTERVAL_MS = 2000;
+
 export function useCustomRoom(roomId?: string) {
   const [room, setRoom] = useState<CustomRoom | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Buscar sala em tempo real
   useEffect(() => {
     if (!roomId) return;
+
+    let cancelled = false;
     setLoading(true);
-    const unsub = onSnapshot(
-      doc(db, "rooms", roomId),
-      (snap) => {
-        if (snap.exists()) {
-          setRoom(snap.data() as CustomRoom);
-        } else {
-          setRoom(null);
+
+    const fetchRoom = async () => {
+      try {
+        const data = await roomsApi.getRoom(roomId);
+        if (!cancelled) {
+          setRoom(data);
+          setError(null);
+          setLoading(false);
         }
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Erro ao buscar sala");
+          setLoading(false);
+        }
       }
-    );
-    return () => unsub();
+    };
+
+    fetchRoom();
+    const interval = setInterval(fetchRoom, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [roomId]);
 
-  // Criar sala custom
-  const createRoom = useCallback(async (room: CustomRoom) => {
+  const createRoom = useCallback(async (roomData: CustomRoom) => {
     setLoading(true);
     try {
-      const ref = doc(db, "rooms", room.id);
-      await setDoc(ref, room);
+      await roomsApi.createRoom(roomData);
       setLoading(false);
-      return room.id;
-    } catch (e) {
-      if (e instanceof Error) setError(e.message);
+      return roomData.id;
+    } catch (err) {
+      if (err instanceof Error) setError(err.message);
       setLoading(false);
       return null;
     }
   }, []);
 
-  // Entrar na sala (adiciona jogador)
-  const joinRoom = useCallback(async (roomId: string, player: RoomPlayer) => {
+  const joinRoom = useCallback(async (targetRoomId: string, player: RoomPlayer) => {
     setLoading(true);
     try {
-      const ref = doc(db, "rooms", roomId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) throw new Error("Sala não encontrada");
-      const data = snap.data() as CustomRoom;
+      const data = await roomsApi.getRoom(targetRoomId);
+      if (!data) throw new Error("Sala não encontrada");
+
       const membros: RoomPlayer[] = data.membros || [];
       const progressoRemovidos: CustomRoom["progressoRemovidos"] =
         data.progressoRemovidos || [];
 
-      // Verifica se já existe membro com o mesmo id
-      const existing = membros.find((m) => m.id === player.id);
+      const existing = membros.find((member) => member.id === player.id);
       if (existing) {
         setLoading(false);
         return "already_joined";
       }
-      // Busca progresso antigo em progressoRemovidos
+
       const progressoAntigoObj = progressoRemovidos.find(
-        (p) => p.id === player.id
+        (entry) => entry.id === player.id
       );
       const progressoAntigo = progressoAntigoObj?.progresso;
+
       membros.push({
         ...player,
         progresso: progressoAntigo ?? [],
       });
-      // Remove progressoRemovido desse userId, se existir
+
       const progressoRemovidosAtualizado = progressoRemovidos.filter(
-        (p) => p.id !== player.id
+        (entry) => entry.id !== player.id
       );
-      await updateDoc(ref, {
+
+      await roomsApi.patchRoom(targetRoomId, {
         membros,
         progressoRemovidos: progressoRemovidosAtualizado,
       });
+
       setLoading(false);
       return true;
-    } catch (e) {
-      if (e instanceof Error) setError(e.message);
+    } catch (err) {
+      if (err instanceof Error) setError(err.message);
       setLoading(false);
       return false;
     }
   }, []);
 
-  // Sair da sala (remover membro)
-  // Se "abandonar" for true, remove o userId da lista de membros E da lista de "acesso direto" (ex: localStorage)
   const leaveRoom = useCallback(
-    async (roomId: string, userId: string, abandonar?: boolean) => {
+    async (targetRoomId: string, userId: string, abandonar?: boolean) => {
       setLoading(true);
       try {
-        const ref = doc(db, "rooms", roomId);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) throw new Error("Sala não encontrada");
-        const data = snap.data() as CustomRoom;
+        const data = await roomsApi.getRoom(targetRoomId);
+        if (!data) throw new Error("Sala não encontrada");
+
         let membros: RoomPlayer[] = data.membros || [];
         let progressoRemovidos: CustomRoom["progressoRemovidos"] =
           data.progressoRemovidos || [];
-        // Busca membro a ser removido
-        const membroRemovido = membros.find((m) => m.id === userId);
+
+        const membroRemovido = membros.find((member) => member.id === userId);
         if (!membroRemovido) {
           setLoading(false);
           return "not_found";
         }
-        // Salva progresso do membro removido, se existir
+
         if (membroRemovido.progresso) {
-          // Remove qualquer progresso antigo desse userId
           progressoRemovidos = progressoRemovidos.filter(
-            (p) => p.id !== userId
+            (entry) => entry.id !== userId
           );
           progressoRemovidos.push({
             id: userId,
             progresso: membroRemovido.progresso,
           });
         }
-        // Se o usuário é o dono:
+
         if (data.ownerId === userId) {
-          // Permite o dono sair de sala permanente, apenas remove dos membros
-          membros = membros.filter((m) => m.id !== userId);
-          await updateDoc(ref, { membros, progressoRemovidos });
+          membros = membros.filter((member) => member.id !== userId);
+          await roomsApi.patchRoom(targetRoomId, { membros, progressoRemovidos });
           setLoading(false);
           return true;
         }
-        // Se "abandonar" for true, remove do localStorage o vínculo de acesso direto
+
         if (abandonar) {
-          localStorage.removeItem(`customRoomUserId_${roomId}`);
+          localStorage.removeItem(`customRoomUserId_${targetRoomId}`);
         }
-        // Se não é o dono, apenas remove dos membros
-        membros = membros.filter((m) => m.id !== userId);
-        await updateDoc(ref, { membros, progressoRemovidos });
+
+        membros = membros.filter((member) => member.id !== userId);
+        await roomsApi.patchRoom(targetRoomId, { membros, progressoRemovidos });
         setLoading(false);
         return true;
-      } catch (e) {
-        if (e instanceof Error) setError(e.message);
+      } catch (err) {
+        if (err instanceof Error) setError(err.message);
         setLoading(false);
         return false;
       }
@@ -146,17 +148,14 @@ export function useCustomRoom(roomId?: string) {
     []
   );
 
-  // Excluir sala (apenas para o dono)
-  const deleteRoom = useCallback(async (roomId: string) => {
+  const deleteRoom = useCallback(async (targetRoomId: string) => {
     setLoading(true);
     try {
-      await (
-        await import("firebase/firestore")
-      ).deleteDoc(doc(db, "rooms", roomId));
+      await roomsApi.deleteRoom(targetRoomId);
       setLoading(false);
       return true;
-    } catch (e) {
-      if (e instanceof Error) setError(e.message);
+    } catch (err) {
+      if (err instanceof Error) setError(err.message);
       setLoading(false);
       return false;
     }

@@ -10,8 +10,7 @@ import {
 } from "../components/CustomRoom/CustomRoomEntry.styles";
 import PrimaryButton from "../components/PrimaryButton";
 import { generateRoomId } from "../utils/generateRoomId";
-import { db } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { roomsApi } from "../api/roomsApi";
 import {
   CreateRoomCard,
   ModeCounter,
@@ -79,9 +78,8 @@ const CustomRoomCreatePage: React.FC = () => {
       const maxTentativas = 10;
       while (tentativas < maxTentativas) {
         const candidate = generateRoomId();
-        const ref = doc(db, "rooms", candidate);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) {
+        const exists = await roomsApi.roomExists(candidate);
+        if (!exists) {
           newRoomId = candidate;
           break;
         }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { db } from "../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { roomsApi } from "../../api/roomsApi";
 import CustomRoomEntry from "./CustomRoomEntry";
 import { useLocation } from "react-router-dom";
 import CustomRoomLobby from "./CustomRoomLobby";
@@ -102,9 +101,8 @@ const CustomRoomFlow: React.FC = () => {
     const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
     let found = false;
     while (tentativas < maxTentativas) {
-      const ref = doc(db, "rooms", newRoomId);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
+      const exists = await roomsApi.roomExists(newRoomId);
+      if (exists) {
         found = true;
         break;
       }
@@ -113,16 +111,11 @@ const CustomRoomFlow: React.FC = () => {
     }
     if (found) {
       setEntryData({ ...data, type: "permanente" });
-      // Espera mais 2 segundos para evitar "piscar" rápido
       await delay(2000);
       setCreating(false);
       window.location.href = `/custom/lobby/${newRoomId}`;
       return;
     }
-    setCreating(false);
-    alert(
-      "Erro ao criar sala: não foi possível confirmar a criação. Tente novamente."
-    );
     setCreating(false);
     alert(
       "Erro ao criar sala: não foi possível confirmar a criação. Tente novamente."

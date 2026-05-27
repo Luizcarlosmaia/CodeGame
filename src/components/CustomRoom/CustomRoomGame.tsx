@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useCustomRoom } from "../../hooks/useCustomRoom";
+import { roomsApi } from "../../api/roomsApi";
 import { generateDailyCode } from "../../utils/generateDailyCode";
 import {
   RankingCard,
@@ -311,30 +312,25 @@ const CustomRoomGame: React.FC = () => {
   async function savePartialProgress(guessesArr: string[][]) {
     if (!room || !rodadaInfo || !rodadaInfo.rodada) return;
     try {
-      const { doc, updateDoc, getDoc } = await import("firebase/firestore");
-      const { db } = await import("../../firebase");
-      const ref = doc(db, "rooms", room.id);
       const dataHoje = todayKey();
-      const palpitesSerializados = guessesArr.map((p) => p.join(""));
-      // Busca o progresso mais recente do Firestore antes de salvar
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const data = snap.data();
+      const palpitesSerializados = guessesArr.map((guess) => guess.join(""));
+      const data = await roomsApi.getRoom(room.id);
+      if (!data) return;
+
       const membros: typeof room.membros = Array.isArray(data.membros)
         ? [...data.membros]
         : [];
       let membroEncontrado = false;
-      const membrosAtualizados = membros.map((m) => {
-        if (m.id !== userId) return m;
+      const membrosAtualizados = membros.map((member) => {
+        if (member.id !== userId) return member;
         membroEncontrado = true;
-        let progressoRemoto = Array.isArray(m.progresso)
-          ? [...m.progresso]
+        let progressoRemoto = Array.isArray(member.progresso)
+          ? [...member.progresso]
           : [];
-        // Remove progresso duplicado do mesmo dia/rodada
         progressoRemoto = progressoRemoto.filter(
-          (p) => !(p.rodada === rodadaInfo.rodada.rodada && p.data === dataHoje)
+          (entry) =>
+            !(entry.rodada === rodadaInfo.rodada.rodada && entry.data === dataHoje)
         );
-        // Adiciona o progresso parcial
         progressoRemoto.push({
           rodada: rodadaInfo.rodada.rodada,
           data: dataHoje,
@@ -343,8 +339,9 @@ const CustomRoomGame: React.FC = () => {
           win: false,
           palpites: palpitesSerializados,
         });
-        return { ...m, progresso: progressoRemoto };
+        return { ...member, progresso: progressoRemoto };
       });
+
       let membrosFinal = membrosAtualizados;
       if (!membroEncontrado) {
         membrosFinal = [
@@ -367,7 +364,8 @@ const CustomRoomGame: React.FC = () => {
           },
         ];
       }
-      await updateDoc(ref, { membros: membrosFinal });
+
+      await roomsApi.patchRoom(room.id, { membros: membrosFinal });
     } catch {
       // Silencia erro de escrita parcial
     }
@@ -381,32 +379,27 @@ const CustomRoomGame: React.FC = () => {
     if (!room || !rodadaInfo || !rodadaInfo.rodada) return;
 
     try {
-      const { doc, updateDoc, getDoc } = await import("firebase/firestore");
-      const { db } = await import("../../firebase");
-      const ref = doc(db, "rooms", room.id);
       const dataHoje = todayKey();
-      const palpitesSerializados = palpites.map((p) => p.join(""));
+      const palpitesSerializados = palpites.map((guess) => guess.join(""));
 
-      // Busca o progresso mais recente do Firestore antes de salvar
-      const snap = await getDoc(ref);
-      if (!snap.exists()) throw new Error("Sala não encontrada");
-      const data = snap.data();
+      const data = await roomsApi.getRoom(room.id);
+      if (!data) throw new Error("Sala não encontrada");
+
       const membros: typeof room.membros = Array.isArray(data.membros)
         ? [...data.membros]
         : [];
 
       let membroEncontrado = false;
-      const membrosAtualizados = membros.map((m) => {
-        if (m.id !== userId) return m;
+      const membrosAtualizados = membros.map((member) => {
+        if (member.id !== userId) return member;
         membroEncontrado = true;
-        let progressoRemoto = Array.isArray(m.progresso)
-          ? [...m.progresso]
+        let progressoRemoto = Array.isArray(member.progresso)
+          ? [...member.progresso]
           : [];
-        // Remove progresso duplicado do mesmo dia/rodada
         progressoRemoto = progressoRemoto.filter(
-          (p) => !(p.rodada === rodadaInfo.rodada.rodada && p.data === dataHoje)
+          (entry) =>
+            !(entry.rodada === rodadaInfo.rodada.rodada && entry.data === dataHoje)
         );
-        // Adiciona o progresso atual
         progressoRemoto.push({
           rodada: rodadaInfo.rodada.rodada,
           data: dataHoje,
@@ -415,7 +408,7 @@ const CustomRoomGame: React.FC = () => {
           win,
           palpites: palpitesSerializados,
         });
-        return { ...m, progresso: progressoRemoto };
+        return { ...member, progresso: progressoRemoto };
       });
 
       let membrosFinal = membrosAtualizados;
@@ -441,16 +434,13 @@ const CustomRoomGame: React.FC = () => {
         ];
       }
 
-      // Atualiza o campo 'codigo' da rodada correspondente no array 'rodadas'
-      // Recupera rodadas atuais do snapshot
       const rodadasAtualizadas = Array.isArray(data.rodadas)
         ? [...data.rodadas]
         : [];
       const rodadaIdxToUpdate = rodadasAtualizadas.findIndex(
-        (r) => r.rodada === rodadaInfo.rodada.rodada
+        (round) => round.rodada === rodadaInfo.rodada.rodada
       );
       if (rodadaIdxToUpdate !== -1) {
-        // Atualiza o campo codigo apenas se estiver vazio ou diferente
         const codigoCorreto = rodadaInfo.code.join("");
         if (rodadasAtualizadas[rodadaIdxToUpdate].codigo !== codigoCorreto) {
           rodadasAtualizadas[rodadaIdxToUpdate] = {
@@ -460,14 +450,14 @@ const CustomRoomGame: React.FC = () => {
         }
       }
 
-      await updateDoc(ref, {
+      await roomsApi.patchRoom(room.id, {
         membros: membrosFinal,
         rodadas: rodadasAtualizadas,
       });
 
-      const roomSnap = await getDoc(ref);
-      if (!roomSnap.exists()) return;
-      const roomData = roomSnap.data();
+      const roomData = await roomsApi.getRoom(room.id);
+      if (!roomData) return;
+
       const membrosAtual: import("../../types/customRoom").RoomPlayer[] =
         Array.isArray(roomData.membros) ? roomData.membros : [];
       const rodadasConfig: { rodada: number; modo?: string }[] = Array.isArray(
@@ -533,7 +523,7 @@ const CustomRoomGame: React.FC = () => {
       });
 
       ranking.sort((a, b) => a.pontos - b.pontos);
-      await updateDoc(ref, { ranking });
+      await roomsApi.patchRoom(room.id, { ranking });
     } catch (e: unknown) {
       const err = e as Error;
       alert("Erro ao salvar progresso: " + (err.message || err));

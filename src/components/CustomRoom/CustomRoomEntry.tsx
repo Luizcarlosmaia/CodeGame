@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 // Removido import duplicado de useLocation/Navigate
-import { db } from "../../firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { roomsApi } from "../../api/roomsApi";
 import {
   EntryContainer,
   Section,
@@ -84,31 +83,31 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
     if (tab === "permanentes" || (tab === "entrar" && hideTabs)) {
       setLoadingPermanent(true);
       const fetchRooms = async () => {
-        const q = query(
-          collection(db, "rooms"),
-          where("type", "==", "permanente")
-        );
-        const snap = await getDocs(q);
-        // Filtra apenas salas abertas onde o userId (específico da sala) está em membros
-        const filtered = snap.docs
-          .map((d) => ({
-            id: d.id,
-            nome: (d.data().nome as string) || "",
-            modos: d.data().modos || [],
-            aberta: d.data().aberta,
-            membros: d.data().membros || [],
-          }))
-          .filter((room) => {
-            const userId = localStorage.getItem(`customRoomUserId_${room.id}`);
-            return (
-              room.aberta !== false &&
-              Array.isArray(room.membros) &&
-              !!userId &&
-              room.membros.some((m) => m.id === userId)
-            );
-          });
-        setPermanentRooms(filtered);
-        setLoadingPermanent(false);
+        try {
+          const rooms = await roomsApi.listPermanentRooms();
+          const filtered = rooms
+            .map((room) => ({
+              id: room.id,
+              nome: room.nome || "",
+              modos: room.modos || [],
+              aberta: room.aberta,
+              membros: room.membros || [],
+            }))
+            .filter((room) => {
+              const userId = localStorage.getItem(`customRoomUserId_${room.id}`);
+              return (
+                room.aberta !== false &&
+                Array.isArray(room.membros) &&
+                !!userId &&
+                room.membros.some((member) => member.id === userId)
+              );
+            });
+          setPermanentRooms(filtered);
+        } catch {
+          setPermanentRooms([]);
+        } finally {
+          setLoadingPermanent(false);
+        }
       };
       fetchRooms();
     }
