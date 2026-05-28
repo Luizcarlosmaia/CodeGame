@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import iconesImg from "../img/icones-tela-inicial.png";
+import heroImg from "../img/home-hero-friends.png";
 
 const features = [
   {
@@ -85,12 +85,18 @@ const Home: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex w-full flex-1 items-center justify-center lg:justify-end">
-            <img
-              src={iconesImg}
-              alt="Ilustração de pessoas jogando CodeGame"
-              className="h-auto w-full max-w-[280px] object-contain drop-shadow-[0_20px_40px_rgba(25,118,210,0.12)] sm:max-w-[340px] lg:max-w-[420px]"
-            />
+          <div className="flex w-full flex-[1.15] items-center justify-center lg:justify-end">
+            <div className="w-full max-w-[min(100%,440px)] sm:max-w-[540px] lg:max-w-[620px] xl:max-w-[680px]">
+              <img
+                src={heroImg}
+                alt="Amigos jogando CodeGame juntos no celular e no tablet"
+                className="h-auto w-full rounded-2xl object-contain drop-shadow-[0_24px_48px_rgba(25,118,210,0.14)] sm:rounded-3xl"
+                width={1536}
+                height={1024}
+                loading="eager"
+                fetchPriority="high"
+              />
+            </div>
           </div>
         </div>
       </main>
