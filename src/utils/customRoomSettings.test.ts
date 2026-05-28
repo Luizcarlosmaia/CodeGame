@@ -126,6 +126,19 @@ describe("customRoomSettings", () => {
     ).toThrow(/anfitrião/i);
   });
 
+  it("applyRoomSettings impede convidado de alterar modos ou expulsar", () => {
+    expect(() =>
+      applyRoomSettings(baseRoom, {
+        userId: "guest1",
+        modos: [{ modo: "casual", rodadas: 1 }],
+      })
+    ).toThrow(/anfitrião/i);
+
+    expect(() =>
+      applyRoomSettings(baseRoom, { userId: "guest1", kickMemberId: "guest1" })
+    ).toThrow(/anfitrião/i);
+  });
+
   it("applyRoomSettings combina alterações", () => {
     const updated = applyRoomSettings(baseRoom, {
       userId: "owner1",

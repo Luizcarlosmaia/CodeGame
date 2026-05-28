@@ -11,6 +11,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:watch": "vitest",
+    "test:api-e2e": "vitest run server/apiHandler.integration.test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "ci": "npm run lint && npm test && npm run build",
     "cleanup:rooms": "node scripts/cleanup-expired-rooms.mjs"
   },
   "dependencies": {
@@ -25,6 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@netlify/functions": "^3.1.10",
+    "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",

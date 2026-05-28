@@ -74,6 +74,7 @@ describe("CustomRoomGame - persistência de progresso", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation((key: string) => {
       if (key === "customRoomUserId_sala1") return "user1";
       if (key === "customRoomUserName") return "Jogador 1";
+      if (key === "customRoomAccessGranted_sala1") return "1";
       return null;
     });
     vi.mocked(roomsApi.getRoom).mockImplementation(async () => stableRoom);

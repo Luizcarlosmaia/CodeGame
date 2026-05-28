@@ -16,6 +16,7 @@ import CustomRoomFlow from "./components/CustomRoom/CustomRoomFlow";
 import CustomRoomGame from "./components/CustomRoom/CustomRoomGame";
 import CustomRoomCreatePage from "./pages/CustomRoomCreatePage";
 import CustomRoomJoinPage from "./pages/CustomRoomJoinPage";
+import AboutPage from "./pages/AboutPage";
 import { resolveModeFromPath, getModeMaxTries, isDailyMode } from "./utils/modeLabels";
 
 function getTodayGameResult(mode: Mode, today: string): "win" | "lose" | null {
@@ -131,6 +132,7 @@ const AppContent: React.FC = () => {
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<Home />} />
         <Route path="/ajuda" element={<HelpPage />} />
+        <Route path="/sobre" element={<AboutPage />} />
         <Route path="/desafios" element={<DailyChallenges />} />
         <Route
           path="/cores"

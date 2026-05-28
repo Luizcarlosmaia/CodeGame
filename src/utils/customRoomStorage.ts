@@ -1,5 +1,6 @@
 import { roomsApi } from "../api/roomsApi";
 import type { CustomRoom } from "../types/customRoom";
+import { markRoomAccessGranted } from "./customRoomAccess";
 import { isRoomPlayable } from "./customRoomLifecycle";
 
 const USER_ID_PREFIX = "customRoomUserId_";
@@ -32,7 +33,7 @@ export async function fetchMyCustomRooms(): Promise<CustomRoom[]> {
     roomIds.map((id) => roomsApi.getRoom(id).catch(() => null))
   );
 
-  return results
+  const rooms = results
     .filter((room): room is CustomRoom => room !== null)
     .filter((room) => {
       const userId = getStoredUserIdForRoom(room.id);
@@ -40,4 +41,10 @@ export async function fetchMyCustomRooms(): Promise<CustomRoom[]> {
       if (!isRoomPlayable(room)) return false;
       return (room.membros ?? []).some((member) => member.id === userId);
     });
+
+  for (const room of rooms) {
+    markRoomAccessGranted(room.id);
+  }
+
+  return rooms;
 }

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useCustomRoom } from "../../hooks/useCustomRoom";
 import { roomsApi } from "../../api/roomsApi";
 import { getCustomRoomDailyCode } from "../../utils/customRoomDailyCode";
@@ -24,8 +24,14 @@ import {
   parseGuess,
   serializeGuess,
 } from "./customRoomGuessDisplay";
+import { isGuessCorrect } from "../../utils/verifyGuess";
+import {
+  canAccessProtectedRoom,
+  getProtectedRoomEntryPath,
+} from "../../utils/customRoomAccess";
 
 const CustomRoomGame: React.FC = () => {
+  const navigate = useNavigate();
   const { roomId } = useParams<{ roomId: string }>();
   const [rodadaAberta, setRodadaAberta] = useState<number | null>(null);
 
@@ -35,6 +41,8 @@ const CustomRoomGame: React.FC = () => {
   }, [roomId]);
 
   const { room, loading, error } = useCustomRoom(roomId);
+
+  const accessCheckedRef = React.useRef(false);
 
   const [guesses, setGuesses] = useState<string[][]>([]);
   const [inputDigits, setInputDigits] = useState<string[]>(["", "", "", ""]);
@@ -53,9 +61,6 @@ const CustomRoomGame: React.FC = () => {
 
   // --- NOVA LÓGICA: só renderiza o dashboard moderno e overlay de rodada ---
 
-  const { joinRoom } = useCustomRoom(roomId);
-  const [joining, setJoining] = useState(false);
-  const [joinTried, setJoinTried] = useState(false);
   let renderContent: React.ReactNode = null;
 
   const player =
@@ -64,29 +69,15 @@ const CustomRoomGame: React.FC = () => {
       : undefined;
 
   React.useEffect(() => {
-    if (
-      room &&
-      userId &&
-      !player &&
-      !joining &&
-      !joinTried &&
-      Array.isArray(room.membros)
-    ) {
-      setJoining(true);
-      joinRoom(roomId!, {
-        id: userId,
-        nome: localStorage.getItem("customRoomUserName") || "Visitante",
-        terminouRodada: false,
-        tentativas: [],
-        progresso: [],
-      }).finally(() => {
-        setJoining(false);
-        setJoinTried(true);
-      });
-    }
-  }, [room, userId, player, joining, joinTried, roomId, joinRoom]);
+    if (!roomId || loading || !room || accessCheckedRef.current) return;
 
-  if (loading || joining) {
+    accessCheckedRef.current = true;
+    if (!canAccessProtectedRoom(room, userId, roomId)) {
+      navigate(getProtectedRoomEntryPath(roomId), { replace: true });
+    }
+  }, [room, userId, roomId, loading, navigate]);
+
+  if (loading) {
     renderContent = (
       <div className="custom-create-page">
         <div className="h-16" aria-hidden />
@@ -315,13 +306,7 @@ const CustomRoomGame: React.FC = () => {
     if (hasFinished) return;
     const lastGuess = guesses[guesses.length - 1];
     if (!lastGuess) return;
-    const isCorrect =
-      rodadaInfo.modo === "codigo-mestre"
-        ? lastGuess.every(
-            (digit, index) =>
-              String(Number(digit)) === String(Number(rodadaInfo.code[index]))
-          )
-        : lastGuess.join("") === rodadaInfo.code.join("");
+    const isCorrect = isGuessCorrect(lastGuess, rodadaInfo.code, rodadaInfo.modo);
     const reachedMaxTries = guesses.length >= (rodadaInfo.maxTries || Infinity);
 
     if (isCorrect) {

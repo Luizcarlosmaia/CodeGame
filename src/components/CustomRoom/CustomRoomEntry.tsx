@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PrimaryButton from "../PrimaryButton";
 import BackButton from "../BackButton";
-import { cn } from "../../lib/cn";
+import { FormField, fieldInputClass } from "../FormField";
 import { getModeLabel } from "../../utils/modeLabels";
 import { fetchMyCustomRooms } from "../../utils/customRoomStorage";
+import { markRoomAccessGranted } from "../../utils/customRoomAccess";
 interface Props {
   onCreate: (data: {
     nome: string;
@@ -51,7 +52,10 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
   const [permanentRooms, setPermanentRooms] = useState<PermanentRoom[]>([]);
   const [loadingPermanent, setLoadingPermanent] = useState(false);
   const [error, setError] = useState<string>("");
-  const [shakeInput, setShakeInput] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    userName?: string;
+    joinId?: string;
+  }>({});
   const joinInputRef = React.useRef<HTMLInputElement>(null);
 
   // Limpa campos ao trocar de aba
@@ -101,74 +105,98 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
             <BackButton to="/home" />
           </div>
           <section className="flex w-full flex-col gap-2 rounded-[14px] bg-surface p-4 shadow-[0_2px_12px_rgba(0,0,0,0.07)] sm:p-6">
-            <label className="input-label">
-              Código da sala <span className="text-[#d32f2f]">*</span>
-            </label>
-            <input
-              ref={joinInputRef}
-              value={joinId}
-              onChange={(e) => setJoinId(e.target.value)}
-              placeholder="Código da sala"
-              maxLength={32}
-              className={cn(
-                "input-field mb-3",
-                shakeInput === "joinId" && !!error && "shake-anim"
-              )}
-            />
-            <label className="input-label mt-3">
-              Seu nome <span className="text-[#d32f2f]">*</span>
-            </label>
-            <input
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              placeholder="Digite seu nome"
-              maxLength={24}
-              className={cn(
-                "input-field mb-3",
-                shakeInput === "userName" && !!error && "shake-anim"
-              )}
-            />
+            <FormField
+              id="custom-entry-room-code"
+              label="Código da sala"
+              required
+              error={fieldErrors.joinId}
+            >
+              <input
+                ref={joinInputRef}
+                id="custom-entry-room-code"
+                value={joinId}
+                onChange={(e) => {
+                  setJoinId(e.target.value);
+                  setFieldErrors((prev) => {
+                    if (!prev.joinId) return prev;
+                    const next = { ...prev };
+                    delete next.joinId;
+                    return next;
+                  });
+                  setError("");
+                }}
+                placeholder="Código da sala"
+                maxLength={32}
+                aria-invalid={!!fieldErrors.joinId}
+                className={fieldInputClass(!!fieldErrors.joinId, "mb-1")}
+              />
+            </FormField>
+            <FormField
+              id="custom-entry-user-name"
+              label="Seu nome"
+              required
+              error={fieldErrors.userName}
+              className="mt-3"
+            >
+              <input
+                id="custom-entry-user-name"
+                value={userName}
+                onChange={(e) => {
+                  setUserName(e.target.value);
+                  setFieldErrors((prev) => {
+                    if (!prev.userName) return prev;
+                    const next = { ...prev };
+                    delete next.userName;
+                    return next;
+                  });
+                  setError("");
+                }}
+                placeholder="Digite seu nome"
+                maxLength={24}
+                aria-invalid={!!fieldErrors.userName}
+                className={fieldInputClass(!!fieldErrors.userName, "mb-1")}
+              />
+            </FormField>
             <PrimaryButton
               className="mt-3"
               onClick={async () => {
-                let vibrate = false;
+                const nextErrors: typeof fieldErrors = {};
                 if (!userName.trim()) {
-                  setError("Digite seu nome.");
-                  setShakeInput("userName");
-                  vibrate = true;
-                } else if (!joinId.trim()) {
-                  setError("Digite o código da sala.");
-                  setShakeInput("joinId");
-                  vibrate = true;
-                } else {
-                  setError("");
-                  setShakeInput(null);
-                  localStorage.setItem("customRoomUserName", userName.trim());
-                  // onJoin agora pode retornar erro
-                  const joinResult = await onJoin(joinId.trim());
-                  if (joinResult === "already_joined") {
-                    setError("Você já está participando desta sala.");
-                    setShakeInput("joinId");
-                    vibrate = true;
-                    return;
-                  }
-                  if (joinResult === false) {
-                    setError("Erro ao entrar na sala. Tente novamente.");
-                    setShakeInput("joinId");
-                    vibrate = true;
-                    return;
-                  }
+                  nextErrors.userName = "Digite seu nome.";
                 }
-                if (vibrate) {
+                if (!joinId.trim()) {
+                  nextErrors.joinId = "Digite o código da sala.";
+                }
+
+                if (Object.keys(nextErrors).length > 0) {
+                  setFieldErrors(nextErrors);
                   if (window.navigator.vibrate) window.navigator.vibrate(120);
-                  setTimeout(() => setShakeInput(null), 350);
+                  return;
+                }
+
+                setFieldErrors({});
+                setError("");
+                localStorage.setItem("customRoomUserName", userName.trim());
+                const joinResult = await onJoin(joinId.trim());
+                if (joinResult === "already_joined") {
+                  setFieldErrors({ joinId: "Você já está participando desta sala." });
+                  if (window.navigator.vibrate) window.navigator.vibrate(120);
+                  return;
+                }
+                if (joinResult === false) {
+                  setError("Erro ao entrar na sala. Tente novamente.");
+                  setFieldErrors({ joinId: "Erro ao entrar na sala. Tente novamente." });
+                  if (window.navigator.vibrate) window.navigator.vibrate(120);
                 }
               }}
             >
               Entrar
             </PrimaryButton>
-            {error && (
-              <p className="mt-2 text-[15px] font-medium text-[#d32f2f]">
+            {error && Object.keys(fieldErrors).length === 0 && (
+              <p
+                className="mt-2 rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 text-sm font-medium text-danger"
+                role="alert"
+              >
                 {error}
               </p>
             )}
@@ -217,7 +245,10 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => navigate(`/custom/lobby/${room.id}`)}
+                    onClick={() => {
+                      markRoomAccessGranted(room.id);
+                      navigate(`/custom/lobby/${room.id}`);
+                    }}
                     className="mt-1 w-full cursor-pointer rounded-md border-0 bg-[#e3eaf5] py-2.5 text-base font-bold text-brand transition-colors hover:bg-[#d6e3f7] hover:text-[#1251a3]"
                   >
                     Entrar

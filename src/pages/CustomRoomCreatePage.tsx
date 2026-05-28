@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
+import { FormField, fieldInputClass } from "../components/FormField";
 import { useCustomRoom } from "../hooks/useCustomRoom";
 import { generateRoomId } from "../utils/generateRoomId";
 import { roomsApi } from "../api/roomsApi";
@@ -9,6 +10,7 @@ import { getModeLabel, MODE_DISPLAY, getModeMaxTries } from "../utils/modeLabels
 import type { CustomRoomMode } from "../utils/modeLabels";
 import type { RoomType, RankingPeriodo } from "../types/customRoom";
 import { getTemporaryRoomExpiresAt } from "../utils/customRoomLifecycle";
+import { markRoomAccessGranted } from "../utils/customRoomAccess";
 import {
   formatRankingPeriodoLabel,
   getNextRankingResetAt,
@@ -55,7 +57,11 @@ const CustomRoomCreatePage: React.FC = () => {
   const [roomType, setRoomType] = useState<RoomType>("permanente");
   const [rankingPeriodo, setRankingPeriodo] = useState<RankingPeriodo>("nunca");
   const [error, setError] = useState("");
-  const [shakeInput, setShakeInput] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    userName?: string;
+    nome?: string;
+    modes?: string;
+  }>({});
   const { createRoom } = useCustomRoom();
 
   const totalRodadas = useMemo(
@@ -73,11 +79,44 @@ const CustomRoomCreatePage: React.FC = () => {
     [selectedModes]
   );
 
-  const canSubmit =
-    nome.trim().length > 0 &&
-    userName.trim().length > 0 &&
-    totalRodadas > 0 &&
-    !creating;
+  const canSubmit = !creating;
+
+  const clearFieldError = (field: keyof typeof fieldErrors) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    setError("");
+  };
+
+  const validateForm = () => {
+    const nextErrors: typeof fieldErrors = {};
+
+    if (!userName.trim()) {
+      nextErrors.userName = "Digite seu nome para entrar na sala.";
+    }
+    if (!nome.trim()) {
+      nextErrors.nome = "Digite um nome para a sala.";
+    }
+    if (totalRodadas === 0) {
+      nextErrors.modes = "Selecione pelo menos um modo de jogo.";
+    }
+
+    setFieldErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      const firstMessage =
+        nextErrors.userName ?? nextErrors.nome ?? nextErrors.modes ?? "";
+      setError(firstMessage);
+      if (window.navigator.vibrate) window.navigator.vibrate(120);
+      return false;
+    }
+
+    setError("");
+    return true;
+  };
 
   const toggleMode = (modo: CustomRoomMode) => {
     setSelectedModes((prev) => {
@@ -88,7 +127,7 @@ const CustomRoomCreatePage: React.FC = () => {
       }
       return { ...prev, [modo]: 1 };
     });
-    setError("");
+    clearFieldError("modes");
   };
 
   const updateModeRounds = (modo: CustomRoomMode, rodadas: number) => {
@@ -96,108 +135,93 @@ const CustomRoomCreatePage: React.FC = () => {
       ...prev,
       [modo]: Math.min(20, Math.max(1, rodadas)),
     }));
+    clearFieldError("modes");
   };
 
   const handleCreate = async () => {
-    if (creating) return;
+    if (creating || !validateForm()) return;
 
-    if (!nome.trim()) {
-      setError("Digite um nome para a sala.");
-      setShakeInput("nome");
-    } else if (!userName.trim()) {
-      setError("Digite seu nome para entrar na sala.");
-      setShakeInput("userName");
-    } else if (totalRodadas === 0) {
-      setError("Selecione pelo menos um modo de jogo.");
-      setShakeInput("modes");
-    } else {
-      setError("");
-      setShakeInput(null);
-      setCreating(true);
-      localStorage.setItem("customRoomUserName", userName.trim());
+    setCreating(true);
+    localStorage.setItem("customRoomUserName", userName.trim());
 
-      try {
-        let newRoomId = "";
-        for (let tentativas = 0; tentativas < 10; tentativas++) {
-          const candidate = generateRoomId();
-          const exists = await roomsApi.roomExists(candidate);
-          if (!exists) {
-            newRoomId = candidate;
-            break;
-          }
+    try {
+      let newRoomId = "";
+      for (let tentativas = 0; tentativas < 10; tentativas++) {
+        const candidate = generateRoomId();
+        const exists = await roomsApi.roomExists(candidate);
+        if (!exists) {
+          newRoomId = candidate;
+          break;
         }
-
-        if (!newRoomId) {
-          setError("Não foi possível gerar o código da sala. Tente novamente.");
-          return;
-        }
-
-        const thisUserId = `user-${Math.random().toString(36).slice(2, 8)}`;
-        localStorage.setItem(`customRoomUserId_${newRoomId}`, thisUserId);
-
-        let rodadaIndex = 1;
-        const rodadas = Object.entries(selectedModes).flatMap(
-          ([modo, rodadasCount]) =>
-            Array.from({ length: rodadasCount }, () => ({
-              rodada: rodadaIndex++,
-              modo,
-              codigo: "",
-              encerrada: false,
-              inicio: "",
-            }))
-        );
-
-        const customRoom = {
-          id: newRoomId,
-          nome: nome.trim(),
-          type: roomType,
-          ownerId: thisUserId,
-          admins: [thisUserId],
-          membros: [
-            {
-              id: thisUserId,
-              nome: userName.trim(),
-              terminouRodada: false,
-              tentativas: [],
-              progresso: [],
-            },
-          ],
-          modo: Object.keys(selectedModes)[0] || "casual",
-          rodadaAtual: 1,
-          rodadas,
-          modos: Object.entries(selectedModes).map(([modo, rodadasCount]) => ({
-            modo,
-            rodadas: rodadasCount,
-          })),
-          ranking: [],
-          aberta: true,
-          criadaEm: new Date().toISOString(),
-          ...(roomType === "temporaria"
-            ? { expiraEm: getTemporaryRoomExpiresAt(), partidaNumero: 1 }
-            : {
-                rankingPeriodo,
-                ...(rankingPeriodo !== "nunca"
-                  ? { rankingResetEm: getNextRankingResetAt(rankingPeriodo) }
-                  : {}),
-              }),
-        };
-
-        await createRoom(customRoom);
-        navigate(`/custom/lobby/${newRoomId}`);
-      } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Erro ao criar a sala. Verifique sua conexão e tente de novo.";
-        setError(message);
-      } finally {
-        setCreating(false);
       }
-      return;
-    }
 
-    if (window.navigator.vibrate) window.navigator.vibrate(120);
-    setTimeout(() => setShakeInput(null), 350);
+      if (!newRoomId) {
+        setError("Não foi possível gerar o código da sala. Tente novamente.");
+        return;
+      }
+
+      const thisUserId = `user-${Math.random().toString(36).slice(2, 8)}`;
+      localStorage.setItem(`customRoomUserId_${newRoomId}`, thisUserId);
+
+      let rodadaIndex = 1;
+      const rodadas = Object.entries(selectedModes).flatMap(
+        ([modo, rodadasCount]) =>
+          Array.from({ length: rodadasCount }, () => ({
+            rodada: rodadaIndex++,
+            modo,
+            codigo: "",
+            encerrada: false,
+            inicio: "",
+          }))
+      );
+
+      const customRoom = {
+        id: newRoomId,
+        nome: nome.trim(),
+        type: roomType,
+        ownerId: thisUserId,
+        admins: [thisUserId],
+        membros: [
+          {
+            id: thisUserId,
+            nome: userName.trim(),
+            terminouRodada: false,
+            tentativas: [],
+            progresso: [],
+          },
+        ],
+        modo: Object.keys(selectedModes)[0] || "casual",
+        rodadaAtual: 1,
+        rodadas,
+        modos: Object.entries(selectedModes).map(([modo, rodadasCount]) => ({
+          modo,
+          rodadas: rodadasCount,
+        })),
+        ranking: [],
+        aberta: true,
+        criadaEm: new Date().toISOString(),
+        ...(roomType === "temporaria"
+          ? { expiraEm: getTemporaryRoomExpiresAt(), partidaNumero: 1 }
+          : {
+              rankingPeriodo,
+              ...(rankingPeriodo !== "nunca"
+                ? { rankingResetEm: getNextRankingResetAt(rankingPeriodo) }
+                : {}),
+            }),
+      };
+
+      await createRoom(customRoom);
+      markRoomAccessGranted(newRoomId);
+      navigate(`/custom/lobby/${newRoomId}`);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Erro ao criar a sala. Verifique sua conexão e tente de novo.";
+      setError(message);
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -241,23 +265,28 @@ const CustomRoomCreatePage: React.FC = () => {
                   Esse nome aparece para os outros jogadores na sala.
                 </p>
 
-                <label htmlFor="custom-room-user-name" className="input-label">
-                  Seu nome
-                </label>
-                <input
+                <FormField
                   id="custom-room-user-name"
-                  value={userName}
-                  onChange={(e) => {
-                    setUserName(e.target.value.slice(0, 24));
-                    setError("");
-                  }}
-                  placeholder="Como quer ser chamado?"
-                  maxLength={24}
-                  className={cn(
-                    "input-field",
-                    shakeInput === "userName" && !!error && "shake-anim"
-                  )}
-                />
+                  label="Seu nome"
+                  required
+                  error={fieldErrors.userName}
+                >
+                  <input
+                    id="custom-room-user-name"
+                    value={userName}
+                    onChange={(e) => {
+                      setUserName(e.target.value.slice(0, 24));
+                      clearFieldError("userName");
+                    }}
+                    placeholder="Como quer ser chamado?"
+                    maxLength={24}
+                    aria-invalid={!!fieldErrors.userName}
+                    aria-describedby={
+                      fieldErrors.userName ? "custom-room-user-name-error" : undefined
+                    }
+                    className={fieldInputClass(!!fieldErrors.userName)}
+                  />
+                </FormField>
               </section>
 
               <section className="custom-create-section">
@@ -266,23 +295,25 @@ const CustomRoomCreatePage: React.FC = () => {
                   Sala privada — só entra quem tiver o código.
                 </p>
 
-                <label htmlFor="custom-room-nome" className="input-label">
-                  Nome da sala
-                </label>
-                <input
+                <FormField
                   id="custom-room-nome"
-                  value={nome}
-                  onChange={(e) => {
-                    setNome(e.target.value.slice(0, 20));
-                    setError("");
-                  }}
-                  placeholder="Ex.: Sala dos amigos"
-                  maxLength={20}
-                  className={cn(
-                    "input-field",
-                    shakeInput === "nome" && !!error && "shake-anim"
-                  )}
-                />
+                  label="Nome da sala"
+                  required
+                  error={fieldErrors.nome}
+                >
+                  <input
+                    id="custom-room-nome"
+                    value={nome}
+                    onChange={(e) => {
+                      setNome(e.target.value.slice(0, 20));
+                      clearFieldError("nome");
+                    }}
+                    placeholder="Ex.: Sala dos amigos"
+                    maxLength={20}
+                    aria-invalid={!!fieldErrors.nome}
+                    className={fieldInputClass(!!fieldErrors.nome)}
+                  />
+                </FormField>
                 <p className="mt-1.5 text-right text-xs text-ink-muted">
                   {nome.length}/20
                 </p>
@@ -382,13 +413,19 @@ const CustomRoomCreatePage: React.FC = () => {
               <section
                 className={cn(
                   "custom-create-section",
-                  shakeInput === "modes" && !!error && "shake-anim"
+                  fieldErrors.modes && "form-field-invalid ring-2 ring-danger/20"
                 )}
               >
                 <h2 className="custom-create-section-title">Modos e rodadas</h2>
                 <p className="custom-create-section-subtitle">
-                  Toque em um modo para incluir. Ajuste quantas rodadas de cada.
+                  Toque em um modo para incluir. Ajuste quantas rodadas de cada.{" "}
+                  <span className="text-danger">*</span>
                 </p>
+                {fieldErrors.modes && (
+                  <p className="field-error mb-3" role="alert">
+                    {fieldErrors.modes}
+                  </p>
+                )}
 
                 <div className="mt-1 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {MODE_OPTIONS.map((mode) => {
@@ -483,7 +520,7 @@ const CustomRoomCreatePage: React.FC = () => {
                 </div>
               </section>
 
-              {error && (
+              {error && Object.keys(fieldErrors).length === 0 && (
                 <p
                   className="rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm font-medium text-danger"
                   role="alert"

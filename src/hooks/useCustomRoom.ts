@@ -3,6 +3,7 @@ import { roomsApi } from "../api/roomsApi";
 import type { CustomRoom, RoomPlayer } from "../types/customRoom";
 import type { RoomSettingsPayload } from "../utils/customRoomSettings";
 import { isRoomPlayable } from "../utils/customRoomLifecycle";
+import { clearRoomAccessGranted } from "../utils/customRoomAccess";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -139,6 +140,7 @@ export function useCustomRoom(roomId?: string) {
 
         if (abandonar) {
           localStorage.removeItem(`customRoomUserId_${targetRoomId}`);
+          clearRoomAccessGranted(targetRoomId);
         }
 
         membros = membros.filter((member) => member.id !== userId);
@@ -159,6 +161,7 @@ export function useCustomRoom(roomId?: string) {
     try {
       await roomsApi.deleteRoom(targetRoomId);
       localStorage.removeItem(`customRoomUserId_${targetRoomId}`);
+      clearRoomAccessGranted(targetRoomId);
       setLoading(false);
       return true;
     } catch (err) {

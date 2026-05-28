@@ -6,6 +6,7 @@ import { useLocation } from "react-router-dom";
 import CustomRoomLobby from "./CustomRoomLobby";
 import { useCustomRoom } from "../../hooks/useCustomRoom";
 import { generateRoomId } from "../../utils/generateRoomId";
+import { markRoomAccessGranted } from "../../utils/customRoomAccess";
 
 // Componente "flow" para alternar entre criar/entrar e o lobby
 const CustomRoomFlow: React.FC = () => {
@@ -25,17 +26,9 @@ const CustomRoomFlow: React.FC = () => {
   // Se acessar via URL direta, inicializa o fluxo para o lobby
   useEffect(() => {
     if (roomId) {
-      // userId persistente por sala permanente
-      let thisUserId = localStorage.getItem(`customRoomUserId_${roomId}`);
-      if (!thisUserId) {
-        thisUserId = `user-${Math.random().toString(36).slice(2, 8)}`;
-        localStorage.setItem(`customRoomUserId_${roomId}`, thisUserId);
-      }
-      setUserId(thisUserId);
-      // userName global
-      const thisUserName =
-        localStorage.getItem("customRoomUserName") || "Visitante";
-      setUserName(thisUserName);
+      const storedUserId = localStorage.getItem(`customRoomUserId_${roomId}`) || "";
+      setUserId(storedUserId);
+      setUserName(localStorage.getItem("customRoomUserName") || "Visitante");
     }
   }, [roomId]);
 
@@ -148,6 +141,7 @@ const CustomRoomFlow: React.FC = () => {
       alert("Erro ao entrar na sala. Tente novamente.");
       return;
     }
+    markRoomAccessGranted(id);
     // Navega para a URL do lobby da sala ao entrar
     window.location.href = `/custom/lobby/${id}`;
   };

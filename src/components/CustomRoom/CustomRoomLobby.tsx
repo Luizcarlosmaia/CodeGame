@@ -15,6 +15,10 @@ import {
   isTemporaryRoom,
   isTemporaryRoomExpired,
 } from "../../utils/customRoomLifecycle";
+import {
+  canAccessProtectedRoom,
+  getProtectedRoomEntryPath,
+} from "../../utils/customRoomAccess";
 import type { RoomSettingsPayload } from "../../utils/customRoomSettings";
 
 interface CustomRoomLobbyProps {
@@ -134,12 +138,13 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
     const isMember = Array.isArray(room.membros)
       ? room.membros.some((member) => member.id === userId)
       : false;
+    const hasAccess = canAccessProtectedRoom(room, userId, roomId);
 
     setPermissaoVerificada(true);
-    setTemPermissao(isMember);
+    setTemPermissao(isMember && hasAccess);
 
-    if (!isMember) {
-      navigate("/custom/entrar", { replace: true });
+    if (!isMember || !hasAccess) {
+      navigate(getProtectedRoomEntryPath(roomId), { replace: true });
     }
   }, [room, userId, loading, isLeaving, navigate]);
 

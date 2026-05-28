@@ -14,6 +14,7 @@ import {
   saveGameState,
   type SavedMode,
 } from "../utils/gameState";
+import { isDigitModeGuessCorrect } from "../utils/verifyGuess";
 
 export function useGame(mode: Mode, onWin: (stats: Stats) => void) {
   // --- 1) carregar e armazenar estado completo por modo ---
@@ -130,7 +131,7 @@ export function useGame(mode: Mode, onWin: (stats: Stats) => void) {
   const guess = useCallback(() => {
     if (hasWon || input.some((d) => !d) || attempt >= maxTries) return;
 
-    const isRight = input.join("") === secretCode.join("");
+    const isRight = isDigitModeGuessCorrect(input, secretCode);
     const nextGuesses = [...guesses, [...input]];
 
     setGameState((prev) => ({

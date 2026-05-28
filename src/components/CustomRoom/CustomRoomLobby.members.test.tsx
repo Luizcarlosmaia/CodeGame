@@ -23,6 +23,8 @@ function renderLobby(room: ReturnType<typeof createCustomRoom>, userId: string) 
 
 describe.each([10, 15, 20])("CustomRoomLobby com %i jogadores", (memberCount) => {
   beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem("customRoomAccessGranted_ROOM-SCALE", "1");
     vi.spyOn(useCustomRoomModule, "useCustomRoom").mockImplementation(() => ({
       room: createCustomRoom(memberCount),
       setRoom: vi.fn(),

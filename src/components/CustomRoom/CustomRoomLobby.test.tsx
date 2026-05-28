@@ -11,6 +11,7 @@ vi.mock("./CustomRoomChat", () => ({
 
 const mockJoinRoom = vi.fn();
 const mockLeaveRoom = vi.fn().mockResolvedValue(true);
+const mockDeleteRoom = vi.fn().mockResolvedValue(true);
 
 const baseRoom: CustomRoom = {
   id: "sala123",
@@ -60,8 +61,15 @@ function confirmAbandon() {
   fireEvent.click(screen.getByRole("button", { name: /sim, abandonar/i }));
 }
 
+function confirmDelete() {
+  fireEvent.click(screen.getByText("Excluir sala"));
+  fireEvent.click(screen.getByRole("button", { name: /sim, excluir/i }));
+}
+
 describe("CustomRoomLobby", () => {
   beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem("customRoomAccessGranted_sala123", "1");
     vi.spyOn(useCustomRoomModule, "useCustomRoom").mockReturnValue({
       room: { ...baseRoom },
       setRoom: vi.fn(),
@@ -70,7 +78,7 @@ describe("CustomRoomLobby", () => {
       createRoom: vi.fn(),
       joinRoom: mockJoinRoom,
       leaveRoom: mockLeaveRoom,
-      deleteRoom: vi.fn(),
+      deleteRoom: mockDeleteRoom,
       transferOwnership: vi.fn(),
       startNewMatch: vi.fn(),
       updateRoomSettings: vi.fn(),
@@ -98,7 +106,7 @@ describe("CustomRoomLobby", () => {
       createRoom: vi.fn(),
       joinRoom: mockJoinRoom,
       leaveRoom: mockLeaveRoom,
-      deleteRoom: vi.fn(),
+      deleteRoom: mockDeleteRoom,
       transferOwnership: vi.fn(),
       startNewMatch: vi.fn(),
       updateRoomSettings: vi.fn(),
@@ -118,7 +126,7 @@ describe("CustomRoomLobby", () => {
       createRoom: vi.fn(),
       joinRoom: mockJoinRoom,
       leaveRoom: mockLeaveRoom,
-      deleteRoom: vi.fn(),
+      deleteRoom: mockDeleteRoom,
       transferOwnership: vi.fn(),
       startNewMatch: vi.fn(),
       updateRoomSettings: vi.fn(),
@@ -148,6 +156,147 @@ describe("CustomRoomLobby", () => {
     alertSpy.mockRestore();
   });
 
+  it("anfitrião vê Excluir sala e aciona deleteRoom ao confirmar", async () => {
+    renderLobby({ userId: "user1", userName: "Dono" });
+
+    expect(screen.getByText("Excluir sala")).toBeInTheDocument();
+    expect(screen.queryByText("Abandonar sala")).not.toBeInTheDocument();
+
+    confirmDelete();
+
+    await waitFor(() => {
+      expect(mockDeleteRoom).toHaveBeenCalledWith("sala123");
+    });
+    expect(mockLeaveRoom).not.toHaveBeenCalled();
+  });
+
+  it("participante vê Abandonar sala e não vê Excluir sala", () => {
+    renderLobby({ userId: "user2", userName: "Participante" });
+
+    expect(screen.getByText("Abandonar sala")).toBeInTheDocument();
+    expect(screen.queryByText("Excluir sala")).not.toBeInTheDocument();
+  });
+
+  describe("controles exclusivos do anfitrião", () => {
+    const roomWithModes: CustomRoom = {
+      ...baseRoom,
+      modos: [
+        { modo: "casual", rodadas: 1 },
+        { modo: "desafio", rodadas: 1 },
+      ],
+      rodadas: [
+        { rodada: 1, modo: "casual", codigo: "", encerrada: false, inicio: "" },
+        { rodada: 2, modo: "desafio", codigo: "", encerrada: false, inicio: "" },
+      ],
+      rankingPeriodo: "semanal",
+    };
+
+    const temporaryRoom: CustomRoom = {
+      ...roomWithModes,
+      type: "temporaria",
+      expiraEm: "2099-01-01T00:00:00.000Z",
+      partidaNumero: 1,
+      rankingPeriodo: undefined,
+    };
+
+    function mockRoom(room: CustomRoom) {
+      vi.spyOn(useCustomRoomModule, "useCustomRoom").mockReturnValue({
+        room,
+        setRoom: vi.fn(),
+        loading: false,
+        error: null,
+        createRoom: vi.fn(),
+        joinRoom: mockJoinRoom,
+        leaveRoom: mockLeaveRoom,
+        deleteRoom: mockDeleteRoom,
+        transferOwnership: vi.fn(),
+        startNewMatch: vi.fn(),
+        updateRoomSettings: vi.fn(),
+      });
+    }
+
+    it("participante não vê painel de configurações editáveis da sala", () => {
+      mockRoom(roomWithModes);
+      renderLobby({ userId: "user2", userName: "Participante" });
+
+      expect(screen.queryByText("Configurações da sala")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^nome da sala$/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /salvar nome/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /salvar modos/i })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/reset do ranking/i)).not.toBeInTheDocument();
+    });
+
+    it("anfitrião vê painel de configurações editáveis da sala", () => {
+      mockRoom(roomWithModes);
+      renderLobby({ userId: "user1", userName: "Dono" });
+
+      expect(screen.getByText("Configurações da sala")).toBeInTheDocument();
+      expect(screen.getByLabelText(/^nome da sala$/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /salvar nome/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/reset do ranking/i)).toBeInTheDocument();
+    });
+
+    it("participante ainda vê resumo read-only da partida", () => {
+      mockRoom(roomWithModes);
+      renderLobby({ userId: "user2", userName: "Participante" });
+
+      expect(screen.getByText("Configuração da partida")).toBeInTheDocument();
+      expect(screen.getAllByText(/Cores/i).length).toBeGreaterThan(0);
+    });
+
+    it("participante não vê ações de transferir ou expulsar", () => {
+      mockRoom(roomWithModes);
+      renderLobby({ userId: "user2", userName: "Participante" });
+
+      expect(
+        screen.queryByRole("button", { name: /tornar anfitrião/i })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /expulsar/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/transferir ou expulsar/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("anfitrião vê ações de transferir e expulsar outros jogadores", () => {
+      mockRoom(roomWithModes);
+      renderLobby({ userId: "user1", userName: "Dono" });
+
+      expect(screen.getByRole("button", { name: /tornar anfitrião/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /expulsar/i })).toBeInTheDocument();
+    });
+
+    it("participante não vê Nova partida em sala temporária", () => {
+      mockRoom(temporaryRoom);
+      renderLobby({ userId: "user2", userName: "Participante" });
+
+      expect(screen.queryByText("Nova partida")).not.toBeInTheDocument();
+    });
+
+    it("anfitrião vê Nova partida em sala temporária", () => {
+      mockRoom(temporaryRoom);
+      renderLobby({ userId: "user1", userName: "Dono" });
+
+      expect(screen.getAllByText("Nova partida").length).toBeGreaterThan(0);
+    });
+
+    it("participante não vê badge Você na linha do anfitrião", () => {
+      mockRoom(roomWithModes);
+      renderLobby({ userId: "user2", userName: "Participante" });
+
+      const hostLine = screen.getByText(/Anfitrião:/i).closest("p");
+      expect(hostLine).toBeTruthy();
+      expect(hostLine?.textContent).not.toMatch(/Você/);
+    });
+
+    it("anfitrião vê badge Você na linha do anfitrião", () => {
+      mockRoom(roomWithModes);
+      renderLobby({ userId: "user1", userName: "Dono" });
+
+      const hostLine = screen.getByText(/Anfitrião:/i).closest("p");
+      expect(hostLine?.textContent).toMatch(/Você/);
+    });
+  });
+
   it("remove usuário da lista de membros para outros usuários", () => {
     vi.spyOn(useCustomRoomModule, "useCustomRoom").mockReturnValue({
       room: {
@@ -168,7 +317,7 @@ describe("CustomRoomLobby", () => {
       createRoom: vi.fn(),
       joinRoom: mockJoinRoom,
       leaveRoom: mockLeaveRoom,
-      deleteRoom: vi.fn(),
+      deleteRoom: mockDeleteRoom,
       transferOwnership: vi.fn(),
       startNewMatch: vi.fn(),
       updateRoomSettings: vi.fn(),
@@ -204,7 +353,7 @@ describe("CustomRoomLobby", () => {
       createRoom: vi.fn(),
       joinRoom: mockJoinRoom,
       leaveRoom: mockLeaveRoom,
-      deleteRoom: vi.fn(),
+      deleteRoom: mockDeleteRoom,
       transferOwnership: vi.fn(),
       startNewMatch: vi.fn(),
       updateRoomSettings: vi.fn(),

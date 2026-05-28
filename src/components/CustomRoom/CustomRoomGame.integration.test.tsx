@@ -63,6 +63,7 @@ describe("CustomRoomGame - integração vitória/derrota", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation((key) => {
       if (key === "customRoomUserId_sala1") return "user1";
       if (key === "customRoomUserName") return "Jogador 1";
+      if (key === "customRoomAccessGranted_sala1") return "1";
       return null;
     });
     vi.mocked(roomsApi.getRoom).mockResolvedValue(baseRoom);

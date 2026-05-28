@@ -3,6 +3,7 @@ import {
   fetchMyCustomRooms,
   getStoredCustomRoomIds,
 } from "./customRoomStorage";
+import { isRoomAccessGranted } from "./customRoomAccess";
 import { roomsApi } from "../api/roomsApi";
 import type { CustomRoom } from "../types/customRoom";
 
@@ -48,6 +49,7 @@ describe("customRoomStorage", () => {
     expect(rooms).toHaveLength(1);
     expect(rooms[0].id).toBe("TEMP123");
     expect(rooms[0].type).toBe("temporaria");
+    expect(isRoomAccessGranted("TEMP123")).toBe(true);
   });
 
   it("fetchMyCustomRooms ignora salas expiradas", async () => {

@@ -30,6 +30,7 @@ import {
   type SavedMode,
 } from "../utils/gameState";
 import { getModeDisplay, getModeMaxTries, isDailyMode } from "../utils/modeLabels";
+import { isCodigoMestreGuessCorrect, isDigitModeGuessCorrect } from "../utils/verifyGuess";
 
 function buildInitialGameState(
   day: string,
@@ -269,15 +270,9 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     }
 
     // Para codigo-mestre, comparar como string normalizada
-    let isCorrect = false;
-    if (isCodigoMestre) {
-      isCorrect = digitsToSubmit.every((d, i) => {
-        const codeVal = secretCode[i];
-        return String(Number(d)) === String(Number(codeVal));
-      });
-    } else {
-      isCorrect = digitsToSubmit.join("") === secretCode.join("");
-    }
+    const isCorrect = isCodigoMestre
+      ? isCodigoMestreGuessCorrect(digitsToSubmit, secretCode)
+      : isDigitModeGuessCorrect(digitsToSubmit, secretCode);
     const nextGuesses = [...guesses, [...digitsToSubmit]];
 
     setGameState((prev) => ({

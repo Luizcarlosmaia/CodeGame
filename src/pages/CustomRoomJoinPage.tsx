@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
+import { FormField, fieldInputClass } from "../components/FormField";
 import { useCustomRoom } from "../hooks/useCustomRoom";
 import { roomsApi } from "../api/roomsApi";
-import { cn } from "../lib/cn";
 import { getModeLabel } from "../utils/modeLabels";
 import {
   formatExpiryCountdown,
   isRoomPlayable,
 } from "../utils/customRoomLifecycle";
 import { fetchMyCustomRooms } from "../utils/customRoomStorage";
+import { markRoomAccessGranted } from "../utils/customRoomAccess";
 import type { RoomType } from "../types/customRoom";
 
 type MyRoom = {
@@ -32,6 +33,7 @@ function normalizeRoomCode(value: string): string {
 
 const CustomRoomJoinPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { joinRoom } = useCustomRoom();
 
   const [userName, setUserName] = useState(
@@ -40,7 +42,10 @@ const CustomRoomJoinPage: React.FC = () => {
   const [joinId, setJoinId] = useState("");
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
-  const [shakeInput, setShakeInput] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    userName?: string;
+    joinId?: string;
+  }>({});
   const [myRooms, setMyRooms] = useState<MyRoom[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(true);
 
@@ -68,15 +73,49 @@ const CustomRoomJoinPage: React.FC = () => {
     loadMyRooms();
   }, [loadMyRooms]);
 
+  useEffect(() => {
+    const codeFromUrl = searchParams.get("codigo");
+    if (codeFromUrl) {
+      setJoinId(normalizeRoomCode(codeFromUrl));
+    }
+  }, [searchParams]);
+
   const totalMyRooms = myRooms.length;
 
-  const canSubmit =
-    userName.trim().length > 0 && joinId.trim().length > 0 && !joining;
+  const canSubmit = !joining;
 
-  const triggerValidationFeedback = (field: string) => {
-    setShakeInput(field);
-    if (window.navigator.vibrate) window.navigator.vibrate(120);
-    setTimeout(() => setShakeInput(null), 350);
+  const clearFieldError = (field: keyof typeof fieldErrors) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    setError("");
+  };
+
+  const validateForm = () => {
+    const code = normalizeRoomCode(joinId);
+    const nextErrors: typeof fieldErrors = {};
+
+    if (!userName.trim()) {
+      nextErrors.userName = "Digite seu nome para entrar na sala.";
+    }
+    if (!code) {
+      nextErrors.joinId = "Digite o código da sala.";
+    }
+
+    setFieldErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      const firstMessage = nextErrors.userName ?? nextErrors.joinId ?? "";
+      setError(firstMessage);
+      if (window.navigator.vibrate) window.navigator.vibrate(120);
+      return false;
+    }
+
+    setError("");
+    return true;
   };
 
   const enterRoom = async (roomId: string) => {
@@ -98,6 +137,7 @@ const CustomRoomJoinPage: React.FC = () => {
     });
 
     if (joinResult === "already_joined" || joinResult === true) {
+      markRoomAccessGranted(roomId);
       navigate(`/custom/lobby/${roomId}`);
       return true;
     }
@@ -107,49 +147,32 @@ const CustomRoomJoinPage: React.FC = () => {
 
   const handleJoin = async (event?: React.FormEvent) => {
     event?.preventDefault();
-    if (joining) return;
+    if (joining || !validateForm()) return;
 
     const code = normalizeRoomCode(joinId);
-
-    if (!userName.trim()) {
-      setError("Digite seu nome para entrar na sala.");
-      triggerValidationFeedback("userName");
-      return;
-    }
-
-    if (!code) {
-      setError("Digite o código da sala.");
-      triggerValidationFeedback("joinId");
-      return;
-    }
-
-    setError("");
-    setShakeInput(null);
     setJoining(true);
 
     try {
       const exists = await roomsApi.roomExists(code);
       if (!exists) {
         setError("Sala não encontrada. Verifique o código e tente de novo.");
-        triggerValidationFeedback("joinId");
+        setFieldErrors({ joinId: "Sala não encontrada. Verifique o código." });
         return;
       }
 
       const roomPreview = await roomsApi.getRoom(code);
       if (!roomPreview || !isRoomPlayable(roomPreview)) {
         setError("Esta sala expirou ou está fechada.");
-        triggerValidationFeedback("joinId");
+        setFieldErrors({ joinId: "Esta sala expirou ou está fechada." });
         return;
       }
 
       const success = await enterRoom(code);
       if (!success) {
         setError("Erro ao entrar na sala. Verifique sua conexão e tente de novo.");
-        triggerValidationFeedback("joinId");
       }
     } catch {
       setError("Erro ao entrar na sala. Verifique sua conexão e tente de novo.");
-      triggerValidationFeedback("joinId");
     } finally {
       setJoining(false);
     }
@@ -204,52 +227,56 @@ const CustomRoomJoinPage: React.FC = () => {
                   Esse nome aparece para os outros jogadores na sala.
                 </p>
 
-                <label htmlFor="custom-join-user-name" className="input-label">
-                  Seu nome
-                </label>
-                <input
+                <FormField
                   id="custom-join-user-name"
-                  value={userName}
-                  onChange={(e) => {
-                    setUserName(e.target.value.slice(0, 24));
-                    setError("");
-                  }}
-                  placeholder="Como quer ser chamado?"
-                  maxLength={24}
-                  className={cn(
-                    "input-field",
-                    shakeInput === "userName" && !!error && "shake-anim"
-                  )}
-                />
+                  label="Seu nome"
+                  required
+                  error={fieldErrors.userName}
+                >
+                  <input
+                    id="custom-join-user-name"
+                    value={userName}
+                    onChange={(e) => {
+                      setUserName(e.target.value.slice(0, 24));
+                      clearFieldError("userName");
+                    }}
+                    placeholder="Como quer ser chamado?"
+                    maxLength={24}
+                    aria-invalid={!!fieldErrors.userName}
+                    className={fieldInputClass(!!fieldErrors.userName)}
+                  />
+                </FormField>
               </section>
 
               <section className="custom-create-section">
                 <h2 className="custom-create-section-title">Código da sala</h2>
-                <p className="custom-create-section-subtitle">
-                  O anfitrião envia um código de 10 caracteres — letras e
-                  números.
-                </p>
 
-                <label htmlFor="custom-join-room-code" className="input-label">
-                  Código
-                </label>
-                <input
+                <FormField
                   id="custom-join-room-code"
-                  value={joinId}
-                  onChange={(e) => {
-                    setJoinId(normalizeRoomCode(e.target.value));
-                    setError("");
-                  }}
-                  placeholder="Ex.: A3K9M2PLQ1"
-                  maxLength={32}
-                  autoCapitalize="characters"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  className={cn(
-                    "input-field font-mono text-lg tracking-widest uppercase",
-                    shakeInput === "joinId" && !!error && "shake-anim"
-                  )}
-                />
+                  label="Código"
+                  required
+                  error={fieldErrors.joinId}
+                  hint="O anfitrião envia um código de 10 caracteres — letras e números."
+                >
+                  <input
+                    id="custom-join-room-code"
+                    value={joinId}
+                    onChange={(e) => {
+                      setJoinId(normalizeRoomCode(e.target.value));
+                      clearFieldError("joinId");
+                    }}
+                    placeholder="Ex.: A3K9M2PLQ1"
+                    maxLength={32}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    aria-invalid={!!fieldErrors.joinId}
+                    className={fieldInputClass(
+                      !!fieldErrors.joinId,
+                      "font-mono text-lg tracking-widest uppercase"
+                    )}
+                  />
+                </FormField>
                 <p className="mt-1.5 text-right text-xs text-ink-muted">
                   {joinId.length} caracteres
                 </p>
@@ -302,7 +329,10 @@ const CustomRoomJoinPage: React.FC = () => {
                         <li key={room.id}>
                           <button
                             type="button"
-                            onClick={() => navigate(`/custom/lobby/${room.id}`)}
+                            onClick={() => {
+                              markRoomAccessGranted(room.id);
+                              navigate(`/custom/lobby/${room.id}`);
+                            }}
                             className="custom-join-room-card w-full text-left"
                           >
                             <div className="flex items-start justify-between gap-3">
