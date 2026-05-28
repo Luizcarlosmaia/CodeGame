@@ -43,23 +43,24 @@ jobs:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
     steps:
       - name: Checkout
-        if: ${{ secrets.NEON_API_KEY != '' }}
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        if: ${{ secrets.NEON_API_KEY != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Instalar dependências
-        if: ${{ secrets.NEON_API_KEY != '' }}
         run: npm ci
 
       - name: Testes API
-        if: ${{ secrets.NEON_API_KEY != '' }}
-        run: npm run test:api-e2e
+        run: |
+          if [ -z "$NEON_API_KEY" ]; then
+            echo "NEON_API_KEY não configurada; pulando testes API E2E."
+            exit 0
+          fi
+          npm run test:api-e2e
 
   e2e:
     name: E2E (Playwright)
@@ -70,24 +71,24 @@ jobs:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
     steps:
       - name: Checkout
-        if: ${{ secrets.NEON_API_KEY != '' }}
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        if: ${{ secrets.NEON_API_KEY != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Instalar dependências
-        if: ${{ secrets.NEON_API_KEY != '' }}
         run: npm ci
 
       - name: Instalar Chromium (Playwright)
-        if: ${{ secrets.NEON_API_KEY != '' }}
         run: npx playwright install --with-deps chromium
 
       - name: Testes E2E
-        if: ${{ secrets.NEON_API_KEY != '' }}
-        run: npm run test:e2e
+        run: |
+          if [ -z "$NEON_API_KEY" ]; then
+            echo "NEON_API_KEY não configurada; pulando testes E2E."
+            exit 0
+          fi
+          npm run test:e2e
