@@ -17,6 +17,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validar workflows GitHub Actions
+        run: node scripts/validate-workflow.mjs
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
