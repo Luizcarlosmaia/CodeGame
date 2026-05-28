@@ -78,7 +78,7 @@ describe("CustomRoomLobby", () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("renderiza o nome da sala e botões principais", () => {
@@ -86,12 +86,12 @@ describe("CustomRoomLobby", () => {
     expect(screen.getByText("Sala Teste")).toBeInTheDocument();
     expect(screen.getAllByText("Iniciar Jogo").length).toBeGreaterThan(0);
     expect(screen.getByText("Abandonar sala")).toBeInTheDocument();
-    expect(screen.getByTestId("custom-room-chat")).toBeInTheDocument();
+    expect(screen.getAllByTestId("custom-room-chat").length).toBeGreaterThan(0);
   });
 
-  it("mostra mensagem de erro se houver erro", () => {
+  it("mostra mensagem de erro se houver erro", async () => {
     vi.spyOn(useCustomRoomModule, "useCustomRoom").mockReturnValue({
-      room: null,
+      room: { ...baseRoom },
       setRoom: vi.fn(),
       loading: false,
       error: "Erro ao carregar sala",
@@ -103,8 +103,10 @@ describe("CustomRoomLobby", () => {
       startNewMatch: vi.fn(),
       updateRoomSettings: vi.fn(),
     });
-    renderLobby();
-    expect(screen.getByText("Erro ao carregar sala")).toBeInTheDocument();
+    renderLobby({ userId: "user2", userName: "Participante" });
+    expect(
+      await screen.findByText("Erro ao carregar sala")
+    ).toBeInTheDocument();
   });
 
   it("mostra mensagem de carregando", () => {

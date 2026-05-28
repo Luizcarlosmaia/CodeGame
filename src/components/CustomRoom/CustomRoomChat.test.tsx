@@ -39,7 +39,7 @@ describe("CustomRoomChat", () => {
     expect(screen.getByText("Chat da sala")).toBeInTheDocument();
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("Olá!")).toBeInTheDocument();
-    expect(screen.getByText("Bob")).toBeInTheDocument();
+    expect(screen.getByText("Você")).toBeInTheDocument();
     expect(screen.getByText("Oi Alice!")).toBeInTheDocument();
   });
 

@@ -1,11 +1,22 @@
-import { screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { renderWithTheme } from "../../test-utils";
+import { screen, fireEvent, waitFor, within, render } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import CustomRoomGame from "./CustomRoomGame";
 import * as useCustomRoomHook from "../../hooks/useCustomRoom";
 import { createUseCustomRoomMock } from "../../test/mockUseCustomRoom";
+import { roomsApi } from "../../api/roomsApi";
+import { getCustomRoomDailyCode } from "../../utils/customRoomDailyCode";
 import { vi } from "vitest";
 import type { CustomRoom, RoomPlayer } from "../../types/customRoom";
+
+vi.mock("../../api/roomsApi", () => ({
+  roomsApi: {
+    getRoom: vi.fn(),
+    patchRoom: vi.fn(),
+  },
+}));
+
+const winningGuessRodada1 = getCustomRoomDailyCode("sala1", 1, "casual");
+const winningGuessRodada2 = getCustomRoomDailyCode("sala1", 2, "casual");
 
 const baseRoom: CustomRoom = {
   id: "sala1",
@@ -34,7 +45,7 @@ const baseRoom: CustomRoom = {
 };
 
 function renderGame() {
-  return renderWithTheme(
+  return render(
     <MemoryRouter initialEntries={["/custom/game/sala1"]}>
       <Routes>
         <Route path="/custom/game/:roomId" element={<CustomRoomGame />} />
@@ -53,39 +64,54 @@ function submitGuess(digits: string[]) {
 
 describe("CustomRoomGame - persistência de progresso", () => {
   let progressoPersistente: RoomPlayer["progresso"] = [];
+  let stableRoom: CustomRoom;
 
   beforeEach(() => {
     progressoPersistente = [];
+    stableRoom = JSON.parse(JSON.stringify(baseRoom)) as CustomRoom;
+    stableRoom.membros[0].progresso = progressoPersistente;
+
     vi.spyOn(Storage.prototype, "getItem").mockImplementation((key: string) => {
       if (key === "customRoomUserId_sala1") return "user1";
       if (key === "customRoomUserName") return "Jogador 1";
       return null;
     });
-    vi.spyOn(useCustomRoomHook, "useCustomRoom").mockImplementation(() => {
-      const room = JSON.parse(JSON.stringify(baseRoom)) as CustomRoom;
-      room.membros[0].progresso = progressoPersistente;
-
-      return createUseCustomRoomMock(room, {
-        setRoom: (value) => {
-          let updated: CustomRoom | null;
+    vi.mocked(roomsApi.getRoom).mockImplementation(async () => stableRoom);
+    vi.mocked(roomsApi.patchRoom).mockImplementation(async (_id, patch) => {
+      if (patch.membros) {
+        stableRoom = { ...stableRoom, membros: patch.membros };
+        progressoPersistente = stableRoom.membros[0]?.progresso ?? [];
+      }
+      if (patch.ranking) {
+        stableRoom = { ...stableRoom, ranking: patch.ranking };
+      }
+      return { ok: true };
+    });
+    vi.spyOn(useCustomRoomHook, "useCustomRoom").mockImplementation(() =>
+      createUseCustomRoomMock(stableRoom, {
+        setRoom: (value: CustomRoom | null | ((prev: CustomRoom | null) => CustomRoom | null)) => {
           if (typeof value === "function") {
-            updated = value(room);
-          } else {
-            updated = value;
+            stableRoom = value(stableRoom) ?? stableRoom;
+          } else if (value) {
+            stableRoom = value;
           }
-          if (updated?.membros?.[0]?.progresso) {
-            progressoPersistente = updated.membros[0].progresso;
+          if (stableRoom.membros[0]?.progresso) {
+            progressoPersistente = stableRoom.membros[0].progresso;
           }
         },
-      });
-    });
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("mantém o progresso do usuário após várias jogadas e reloads", async () => {
     renderGame();
 
     fireEvent.click(screen.getByTestId("play-round-1"));
-    submitGuess(["1", "2", "3", "4"]);
+    submitGuess(winningGuessRodada1);
     await waitFor(() => {
       expect(screen.getByText(/vitória!/i)).toBeInTheDocument();
     });
@@ -99,7 +125,9 @@ describe("CustomRoomGame - persistência de progresso", () => {
 
     fireEvent.click(screen.getByTestId("play-round-2"));
     for (let i = 0; i < 6; i++) {
-      submitGuess(["0", "0", "0", "0"]);
+      submitGuess(
+        winningGuessRodada2.map((digit) => (digit === "9" ? "0" : "9"))
+      );
     }
     await waitFor(() => {
       expect(screen.getByText(/rodada encerrada/i)).toBeInTheDocument();
