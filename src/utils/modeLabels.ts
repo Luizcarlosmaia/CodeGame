@@ -49,7 +49,7 @@ export function isDailyMode(mode: Mode): mode is DailyMode {
 export const MODE_MAX_TRIES: Record<DailyMode, number> = {
   casual: 6,
   desafio: 15,
-  "codigo-mestre": 9,
+  "codigo-mestre": 12,
 };
 
 export function getModeMaxTries(mode: DailyMode): number {

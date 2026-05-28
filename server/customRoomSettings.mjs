@@ -13,7 +13,7 @@ function computeRoomRanking(membros, rodadas, room) {
     const pontos = (member.progresso ?? []).reduce((total, entry) => {
       if (!entry.terminou) return total;
       const modo = getModoForRodada(entry.rodada);
-      const maxTries = modo === "desafio" ? 15 : modo === "codigo-mestre" ? 9 : 6;
+      const maxTries = modo === "desafio" ? 15 : modo === "codigo-mestre" ? 12 : 6;
       if (!entry.win || entry.tentativas <= 0) return total;
       const tries = Math.min(Math.max(entry.tentativas, 1), maxTries);
       return total + (maxTries - tries + 1);

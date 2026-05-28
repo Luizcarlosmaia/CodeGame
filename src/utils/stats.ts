@@ -1,3 +1,5 @@
+import { getModeMaxTries } from "./modeLabels";
+
 export type Mode = "casual" | "desafio" | "custom" | "codigo-mestre";
 
 type StatsMode = Extract<Mode, "casual" | "desafio" | "codigo-mestre">;
@@ -28,8 +30,7 @@ export function todayKey(): string {
 }
 
 function defaultDistribution(mode: StatsMode): Record<number, number> {
-  const maxTries =
-    mode === "desafio" ? 15 : mode === "codigo-mestre" ? 9 : 6;
+  const maxTries = getModeMaxTries(mode);
 
   return Object.fromEntries(
     Array.from({ length: maxTries }, (_, index) => [index + 1, 0])

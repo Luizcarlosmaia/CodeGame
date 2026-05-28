@@ -73,7 +73,7 @@ describe("Game integração - modos diários", () => {
       />
     );
 
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 12; i++) {
       inputGuess(["9", "9", "9", "9"]);
     }
 

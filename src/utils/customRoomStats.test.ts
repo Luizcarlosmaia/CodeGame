@@ -88,8 +88,8 @@ describe("custom room scoring (fórmula B)", () => {
     expect(computeRoundScore("casual", 6, true)).toBe(1);
     expect(computeRoundScore("desafio", 1, true)).toBe(15);
     expect(computeRoundScore("desafio", 15, true)).toBe(1);
-    expect(computeRoundScore("codigo-mestre", 1, true)).toBe(9);
-    expect(computeRoundScore("codigo-mestre", 9, true)).toBe(1);
+    expect(computeRoundScore("codigo-mestre", 1, true)).toBe(12);
+    expect(computeRoundScore("codigo-mestre", 12, true)).toBe(1);
   });
 
   it("derrota ou tentativa inválida vale zero", () => {

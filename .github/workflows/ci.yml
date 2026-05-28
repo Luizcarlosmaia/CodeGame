@@ -39,48 +39,55 @@ jobs:
     name: API E2E (Neon)
     runs-on: ubuntu-latest
     needs: quality
-    if: ${{ secrets.NEON_API_KEY != '' }}
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
     steps:
       - name: Checkout
+        if: ${{ secrets.NEON_API_KEY != '' }}
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: ${{ secrets.NEON_API_KEY != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Instalar dependências
+        if: ${{ secrets.NEON_API_KEY != '' }}
         run: npm ci
 
       - name: Testes API
+        if: ${{ secrets.NEON_API_KEY != '' }}
         run: npm run test:api-e2e
 
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
     needs: quality
-    if: ${{ secrets.NEON_API_KEY != '' }}
     env:
       CI: true
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
     steps:
       - name: Checkout
+        if: ${{ secrets.NEON_API_KEY != '' }}
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: ${{ secrets.NEON_API_KEY != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Instalar dependências
+        if: ${{ secrets.NEON_API_KEY != '' }}
         run: npm ci
 
       - name: Instalar Chromium (Playwright)
+        if: ${{ secrets.NEON_API_KEY != '' }}
         run: npx playwright install --with-deps chromium
 
       - name: Testes E2E
+        if: ${{ secrets.NEON_API_KEY != '' }}
         run: npm run test:e2e

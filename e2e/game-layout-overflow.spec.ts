@@ -104,7 +104,7 @@ for (const viewport of viewports) {
       expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
     });
 
-    test("modo Código Mestre com 9 tentativas (valores 00-99)", async ({ page }) => {
+    test("modo Código Mestre com 12 tentativas (valores 00-99)", async ({ page }) => {
       await page.goto("/codigo-mestre");
       await expect(page.getByRole("button", { name: /enviar palpite/i })).toBeVisible();
 
@@ -118,6 +118,9 @@ for (const viewport of viewports) {
         ["93", "82", "71", "60"],
         ["92", "81", "70", "59"],
         ["91", "80", "69", "58"],
+        ["90", "79", "68", "57"],
+        ["89", "78", "67", "56"],
+        ["88", "77", "66", "55"],
       ];
 
       for (const guess of guesses) {
