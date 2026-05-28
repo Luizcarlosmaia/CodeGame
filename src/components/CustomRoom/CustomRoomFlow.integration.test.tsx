@@ -1,7 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import CustomRoomFlow from "./CustomRoomFlow";
-import { ThemeProvider } from "styled-components";
-import { theme } from "../../theme";
 import * as useCustomRoomHook from "../../hooks/useCustomRoom";
 import { BrowserRouter } from "react-router-dom";
 import { vi } from "vitest";
@@ -22,15 +20,16 @@ describe("CustomRoomFlow - join room", () => {
       error: null,
       leaveRoom: vi.fn(),
       deleteRoom: vi.fn(),
+      transferOwnership: vi.fn(),
+      startNewMatch: vi.fn(),
+      updateRoomSettings: vi.fn(),
     });
     window.alert = vi.fn();
 
     render(
-      <ThemeProvider theme={theme}>
-        <BrowserRouter>
-          <CustomRoomFlow />
-        </BrowserRouter>
-      </ThemeProvider>
+      <BrowserRouter>
+        <CustomRoomFlow />
+      </BrowserRouter>
     );
 
     // Garante que está na aba 'Entrar'

@@ -1,4 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { vi } from "vitest";
 import CustomRoomRodadaPainel from "./CustomRoomRodadaPainel";
 
 describe("CustomRoomRodadaPainel", () => {
@@ -13,51 +15,64 @@ describe("CustomRoomRodadaPainel", () => {
     hasWon: false,
     hasFinished: null,
     inputDigits: ["", "", "", ""],
-    setInputDigits: jest.fn(),
-    setGuesses: jest.fn(),
-    handleGuess: jest.fn(),
-    setRodadaAberta: jest.fn(),
-    setHasFinished: jest.fn(),
+    setInputDigits: vi.fn(),
+    setGuesses: vi.fn(),
+    handleGuess: vi.fn(),
+    setRodadaAberta: vi.fn(),
+    setHasFinished: vi.fn(),
   };
 
-  it("renderiza o componente e o Game", () => {
-    render(<CustomRoomRodadaPainel {...baseProps} />);
-    expect(screen.getByRole("button")).toBeInTheDocument();
+  it("renderiza o componente e o Game enquanto joga", () => {
+    render(
+      <MemoryRouter>
+        <CustomRoomRodadaPainel {...baseProps} />
+      </MemoryRouter>
+    );
+    expect(screen.getByLabelText(/voltar/i)).toBeInTheDocument();
   });
 
-  it("exibe mensagem de vitória", () => {
+  it("exibe tela de vitória com pontos e tentativas", () => {
     render(
       <CustomRoomRodadaPainel
         {...baseProps}
-        hasFinished={{ win: true, tries: 3 }}
-        setHasFinished={jest.fn()}
+        guesses={[["1", "2", "3", "4"]]}
+        hasFinished={{ win: true, tries: 1 }}
       />
     );
-    expect(screen.getByText(/você ganhou!/i)).toBeInTheDocument();
+    expect(screen.getByText(/vitória!/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+6 pts/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 2 3 4/)).toHaveClass("custom-game-guess-chip-win");
   });
 
-  it("exibe mensagem de derrota", () => {
+  it("exibe tela de derrota", () => {
     render(
       <CustomRoomRodadaPainel
         {...baseProps}
+        guesses={[
+          ["0", "0", "0", "0"],
+          ["1", "1", "1", "1"],
+        ]}
         hasFinished={{ win: false, tries: 6 }}
-        setHasFinished={jest.fn()}
       />
     );
-    expect(screen.getByText(/você perdeu!/i)).toBeInTheDocument();
+    expect(screen.getByText(/rodada encerrada/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\+.*pts/i)).not.toBeInTheDocument();
   });
 
-  it("chama setRodadaAberta ao clicar no botão", () => {
-    const setRodadaAberta = jest.fn();
+  it("chama setRodadaAberta ao voltar", () => {
+    const setRodadaAberta = vi.fn();
+    const setHasFinished = vi.fn();
     render(
       <CustomRoomRodadaPainel
         {...baseProps}
+        guesses={[["1", "2", "3", "4"]]}
         hasFinished={{ win: true, tries: 2 }}
         setRodadaAberta={setRodadaAberta}
-        setHasFinished={jest.fn()}
+        setHasFinished={setHasFinished}
       />
     );
-    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("button", { name: /voltar para rodadas/i }));
     expect(setRodadaAberta).toHaveBeenCalledWith(null);
+    expect(setHasFinished).toHaveBeenCalledWith(null);
   });
 });

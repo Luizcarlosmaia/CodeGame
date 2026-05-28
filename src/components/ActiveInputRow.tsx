@@ -1,12 +1,6 @@
-import React from "react";
-import { DigitInput } from "../styles/AppStyles";
+import React, { useState } from "react";
 import { getStatuses } from "../utils/getFeedback";
-import {
-  RowWrapper,
-  ArrowRow,
-  Arrow,
-  InputsRow,
-} from "./ActiveInputRow.styles";
+import { cn } from "../lib/cn";
 
 interface ActiveInputRowProps {
   inputDigits: string[];
@@ -17,8 +11,18 @@ interface ActiveInputRowProps {
   hasWon: boolean;
   isLost: boolean;
   guessesLength?: number;
-  modoVisual?: boolean; // novo: ativa layout especial
-  shakeInput?: boolean; // animação de erro
+  modoVisual?: boolean;
+  shakeInput?: boolean;
+  variant?: "default" | "casual";
+}
+
+function arrowColor(
+  status: "correct" | "present" | "absent",
+  arrow: "up" | "down"
+) {
+  if (status === "correct") return "text-[#217a4b]";
+  if (status === "present") return arrow === "up" ? "text-[#bfa100]" : "text-[#222]";
+  return "text-[#bbb]";
 }
 
 export const ActiveInputRow: React.FC<ActiveInputRowProps> = ({
@@ -32,8 +36,11 @@ export const ActiveInputRow: React.FC<ActiveInputRowProps> = ({
   guessesLength = 0,
   modoVisual = false,
   shakeInput = false,
+  variant = "default",
 }) => {
-  // Só mostra feedback visual se já enviou (todos preenchidos e já tentou)
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const isCasual = variant === "casual";
+
   const showFeedback =
     (inputDigits.every((d) => d && d !== "") && guessesLength > 0) ||
     hasWon ||
@@ -48,13 +55,11 @@ export const ActiveInputRow: React.FC<ActiveInputRowProps> = ({
       ? getStatuses(inputDigits, secretCode)
       : Array(4).fill("absent");
 
-  // Função para controlar avanço automático do input
   const handleInputChange = (val: string, idx: number) => {
     let newVal = val.replace(/\D/g, "");
     if (isCodigoMestre) {
       if (newVal.length > 2) newVal = newVal.slice(0, 2);
       onChange(newVal, idx);
-      // Só avança se tiver 2 dígitos OU se o valor for maior que 9
       if ((newVal.length === 2 || parseInt(newVal, 10) > 9) && idx < 3) {
         inputRefs.current[idx + 1]?.focus();
       }
@@ -65,95 +70,97 @@ export const ActiveInputRow: React.FC<ActiveInputRowProps> = ({
     }
   };
 
-  // Layout especial só se modoVisual=true (codigo-mestre)
+  const gapClass = modoVisual
+    ? isCodigoMestre
+      ? "gap-6"
+      : "gap-4"
+    : isCasual
+      ? "gap-3 sm:gap-3.5"
+      : isCodigoMestre
+        ? "gap-3"
+        : "gap-1";
+
+  const arrowWidthClass = modoVisual
+    ? isCodigoMestre
+      ? "w-16 text-[38px]"
+      : "w-14 text-[32px]"
+    : "w-12 text-[22px]";
+
+  const renderInput = (digit: string, i: number) => (
+    <input
+      key={i}
+      value={digit}
+      onChange={(e) => handleInputChange(e.target.value, i)}
+      onFocus={() => setFocusedIndex(i)}
+      maxLength={isCodigoMestre && modoVisual ? 2 : isCodigoMestre ? 2 : 1}
+      ref={(el) => {
+        inputRefs.current[i] = el;
+      }}
+      disabled={hasWon || isLost}
+      inputMode="numeric"
+      aria-label={`Dígito ${i + 1}`}
+      className={cn(
+        isCasual ? "game-digit-input-casual" : "game-digit-input",
+        shakeInput && "shake-anim",
+        isCasual &&
+          focusedIndex === i &&
+          !hasWon &&
+          !isLost &&
+          "game-digit-input-casual-active",
+        modoVisual && "size-[72px] rounded-xl border-[3px] text-[2.5rem]",
+        modoVisual && isCodigoMestre && "size-20 text-[2.75rem]"
+      )}
+      placeholder={isCodigoMestre ? "00" : isCasual ? "" : "_"}
+    />
+  );
+
   if (modoVisual) {
     return (
-      <RowWrapper>
-        <ArrowRow $isCodigoMestre={isCodigoMestre} $modoVisual={modoVisual}>
+      <div className="flex flex-col items-center">
+        <div className={cn("mb-1.5 flex min-h-8 justify-center", gapClass)}>
           {inputDigits.map((_, i) => (
-            <Arrow
+            <span
               key={i}
-              $status={statuses[i]}
-              $arrow="up"
-              $isCodigoMestre={isCodigoMestre}
-              $modoVisual={modoVisual}
+              className={cn(
+                "inline-block h-8 text-center font-bold transition-colors select-none",
+                arrowWidthClass,
+                arrowColor(statuses[i], "up")
+              )}
             >
               ↑
-            </Arrow>
+            </span>
           ))}
-        </ArrowRow>
-        <InputsRow $isCodigoMestre={isCodigoMestre} $modoVisual={modoVisual}>
-          {inputDigits.map((digit, i) => (
-            <DigitInput
-              key={i}
-              value={digit}
-              onChange={(e) => handleInputChange(e.target.value, i)}
-              maxLength={isCodigoMestre && modoVisual ? 2 : 1}
-              ref={(el) => {
-                inputRefs.current[i] = el;
-              }}
-              disabled={hasWon || isLost}
-              inputMode="numeric"
-              className={shakeInput ? "shake" : ""}
-              // Tamanhos grandes só no modo codigo-mestre visual
-              style={
-                isCodigoMestre && modoVisual
-                  ? {
-                      width: 80,
-                      height: 80,
-                      fontSize: 44,
-                      borderWidth: 3,
-                      borderRadius: 12,
-                    }
-                  : modoVisual
-                  ? {
-                      width: 72,
-                      height: 72,
-                      fontSize: 40,
-                      borderWidth: 3,
-                      borderRadius: 12,
-                    }
-                  : undefined
-              }
-              placeholder={isCodigoMestre ? "00" : "_"}
-            />
-          ))}
-        </InputsRow>
-        <ArrowRow $isCodigoMestre={isCodigoMestre} $modoVisual={modoVisual}>
+        </div>
+        <div className={cn("my-2 flex justify-center", gapClass)}>
+          {inputDigits.map((digit, i) => renderInput(digit, i))}
+        </div>
+        <div className={cn("flex min-h-8 justify-center", gapClass)}>
           {inputDigits.map((_, i) => (
-            <Arrow
+            <span
               key={i}
-              $status={statuses[i]}
-              $arrow="down"
-              $isCodigoMestre={isCodigoMestre}
-              $modoVisual={modoVisual}
+              className={cn(
+                "inline-block h-8 text-center font-bold transition-colors select-none",
+                arrowWidthClass,
+                arrowColor(statuses[i], "down")
+              )}
             >
               ↓
-            </Arrow>
+            </span>
           ))}
-        </ArrowRow>
-      </RowWrapper>
+        </div>
+      </div>
     );
   }
 
-  // Layout padrão para outros modos
   return (
-    <InputsRow $isCodigoMestre={isCodigoMestre} $modoVisual={false}>
-      {inputDigits.map((digit, i) => (
-        <DigitInput
-          key={i}
-          value={digit}
-          onChange={(e) => handleInputChange(e.target.value, i)}
-          maxLength={isCodigoMestre ? 2 : 1}
-          ref={(el) => {
-            inputRefs.current[i] = el;
-          }}
-          disabled={hasWon || isLost}
-          inputMode="numeric"
-          className={shakeInput ? "shake" : ""}
-          placeholder={isCodigoMestre ? "00" : "_"}
-        />
-      ))}
-    </InputsRow>
+    <div
+      className={cn(
+        "flex justify-center",
+        isCasual ? "game-casual-input-wrap" : "my-1 shrink-0",
+        gapClass
+      )}
+    >
+      {inputDigits.map((digit, i) => renderInput(digit, i))}
+    </div>
   );
 };

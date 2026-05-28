@@ -1,4 +1,5 @@
 import type { CustomRoom } from "../types/customRoom";
+import type { RoomSettingsPayload } from "../utils/customRoomSettings";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -27,18 +28,40 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
 
+  const raw = await response.text();
+  let payload: unknown = null;
+
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      if (raw.trimStart().startsWith("<!DOCTYPE") || raw.trimStart().startsWith("<html")) {
+        throw new Error(
+          "API indisponível. Reinicie o app com npm run dev (servidor local + Vite)."
+        );
+      }
+      throw new Error("Resposta inválida da API.");
+    }
+  }
+
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as {
-      error?: string;
-    } | null;
-    throw new Error(payload?.error ?? response.statusText);
+    const message =
+      payload &&
+      typeof payload === "object" &&
+      "error" in payload &&
+      typeof (payload as { error?: string }).error === "string"
+        ? (payload as { error: string }).error
+        : response.status === 404 && path.includes("/settings")
+          ? "Rota de configurações indisponível. Reinicie com npm run dev (feche processos na porta 3001)."
+          : response.statusText;
+    throw new Error(message);
   }
 
   if (response.status === 204) {
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  return payload as T;
 }
 
 export const roomsApi = {
@@ -92,6 +115,34 @@ export const roomsApi = {
         method: "POST",
         body: JSON.stringify(payload),
       }
+    );
+  },
+
+  startNewMatch(roomId: string, userId: string) {
+    return request<{ ok: boolean; room: CustomRoom }>(
+      `/rooms/${encodeURIComponent(roomId)}/nova-partida`,
+      {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      }
+    );
+  },
+
+  updateRoomSettings(roomId: string, payload: RoomSettingsPayload) {
+    return request<{ ok: boolean; room: CustomRoom }>(
+      `/rooms/${encodeURIComponent(roomId)}/settings`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  cleanupExpiredRooms(secret?: string) {
+    const query = secret ? `?secret=${encodeURIComponent(secret)}` : "";
+    return request<{ ok: boolean; deleted: number; ids: string[] }>(
+      `/rooms/cleanup-expired${query}`,
+      { method: "POST" }
     );
   },
 };

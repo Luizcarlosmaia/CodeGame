@@ -1,8 +1,7 @@
-// Tipos para salas customizadas (temporárias e fixas)
-
-// Pronto para outros tipos no futuro, mas só "permanente" por enquanto
-export type RoomType = "permanente";
-export type RoomMode = "casual" | "desafio" | string; // pronto para novos modos
+// Tipos para salas customizadas (temporárias e permanentes)
+export type RoomType = "permanente" | "temporaria";
+export type RankingPeriodo = "nunca" | "semanal" | "mensal";
+export type RoomMode = "casual" | "desafio" | string;
 
 export interface RoomPlayer {
   id: string;
@@ -15,7 +14,7 @@ export interface RoomPlayer {
     tentativas: number;
     terminou: boolean;
     win?: boolean; // indica se ganhou a rodada
-    palpites?: string[]; // histórico dos palpites do usuário na rodada (serializado para Firestore)
+    palpites?: string[]; // histórico dos palpites do usuário na rodada
   }>;
   isOwner?: boolean;
   isMaster?: boolean;
@@ -24,6 +23,7 @@ export interface RoomPlayer {
 export interface RoomRound {
   codigo: string;
   rodada: number;
+  modo?: string;
   encerrada: boolean;
   tempoLimite?: number; // segundos
   inicio: string; // ISO
@@ -33,7 +33,7 @@ export interface RoomRound {
 export interface RoomRanking {
   playerId: string;
   nome: string;
-  pontos: number; // menor é melhor
+  pontos: number; // maior é melhor
 }
 
 export interface CustomRoom {
@@ -50,7 +50,17 @@ export interface CustomRoom {
   rodadas: RoomRound[];
   ranking: RoomRanking[];
   tempoPorRodada?: number; // segundos
-  codigoDoDia?: string; // para salas fixas
+  /** ISO — fim da validade (salas temporárias, 5h após criação) */
+  expiraEm?: string;
+  /** ISO — quando a sala temporária foi desativada por TTL */
+  expiradaEm?: string;
+  /** Contador de partidas reiniciadas (temporárias) */
+  partidaNumero?: number;
+  /** Reset total do ranking: nunca | semanal | mensal (permanentes) */
+  rankingPeriodo?: RankingPeriodo;
+  /** ISO — próximo reset automático do ranking (permanentes) */
+  rankingResetEm?: string;
+  codigoDoDia?: string;
   aberta: boolean;
   criadaEm: string;
   fechadaEm?: string;
@@ -58,4 +68,6 @@ export interface CustomRoom {
     id: string;
     progresso?: RoomPlayer["progresso"];
   }>;
+  /** Mapa rodada → modo (inclui rodadas já removidas da config, para pontuação) */
+  rodadaModoHistorico?: Record<string, string>;
 }

@@ -1,8 +1,14 @@
 import { render, screen, fireEvent } from "@testing-library/react";
+import { vi } from "vitest";
 import { CustomRoomRounds } from "./CustomRoomRounds";
 import type { RoomPlayer } from "../../types/customRoom";
+import { todayKey } from "../../utils/stats";
 
 describe("CustomRoomRounds", () => {
+  const today = todayKey();
+  const permanentRoom = { type: "permanente" as const, partidaNumero: undefined };
+  const temporaryRoom = { type: "temporaria" as const, partidaNumero: 2 };
+
   const basePlayer: RoomPlayer = {
     id: "user1",
     nome: "Jogador 1",
@@ -21,34 +27,35 @@ describe("CustomRoomRounds", () => {
       <CustomRoomRounds
         rodadas={[]}
         player={basePlayer}
+        room={permanentRoom}
         setRodadaAberta={() => {}}
       />
     );
     expect(screen.getByText(/nenhuma rodada configurada/i)).toBeInTheDocument();
   });
 
-  it("exibe rodadas e status de não jogado", () => {
+  it("exibe rodadas não iniciadas com botão de jogar", () => {
     render(
       <CustomRoomRounds
         rodadas={rodadas}
         player={basePlayer}
+        room={permanentRoom}
         setRodadaAberta={() => {}}
       />
     );
     expect(screen.getByText(/Rodada 1/)).toBeInTheDocument();
     expect(screen.getByText(/Rodada 2/)).toBeInTheDocument();
-    expect(
-      screen.getAllByText(/você ainda não jogou esta rodada/i)
-    ).toHaveLength(2);
+    expect(screen.getAllByText(/não iniciada/i)).toHaveLength(2);
+    expect(screen.getAllByText(/jogar rodada/i)).toHaveLength(2);
   });
 
-  it("exibe status de vitória e palpites", () => {
+  it("exibe vitória, pontos e tentativas coloridas no card", () => {
     const player: RoomPlayer = {
       ...basePlayer,
       progresso: [
         {
           rodada: 1,
-          data: new Date().toISOString().slice(0, 10).replace(/-/g, ""),
+          data: today,
           tentativas: 2,
           terminou: true,
           win: true,
@@ -60,24 +67,25 @@ describe("CustomRoomRounds", () => {
       <CustomRoomRounds
         rodadas={rodadas}
         player={player}
+        room={permanentRoom}
         setRodadaAberta={() => {}}
       />
     );
-    expect(
-      screen.getByText(/você já ganhou esta rodada hoje/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/seus palpites/i)).toBeInTheDocument();
+    expect(screen.getByText(/acertou em 2 tentativas/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+5 pts/i)).toBeInTheDocument();
     expect(screen.getByText(/1 2 3 4/)).toBeInTheDocument();
     expect(screen.getByText(/4 3 2 1/)).toBeInTheDocument();
+    expect(screen.queryByText(/ver resultado/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("play-round-1")).not.toBeInTheDocument();
   });
 
-  it("exibe status de derrota", () => {
+  it("exibe derrota com última tentativa destacada", () => {
     const player: RoomPlayer = {
       ...basePlayer,
       progresso: [
         {
           rodada: 2,
-          data: new Date().toISOString().slice(0, 10).replace(/-/g, ""),
+          data: today,
           tentativas: 3,
           terminou: true,
           win: false,
@@ -89,38 +97,35 @@ describe("CustomRoomRounds", () => {
       <CustomRoomRounds
         rodadas={rodadas}
         player={player}
+        room={permanentRoom}
         setRodadaAberta={() => {}}
       />
     );
-    expect(
-      screen.getByText(/você já perdeu esta rodada hoje/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/5 6 7 8/)).toBeInTheDocument();
-    expect(screen.getByText(/8 7 6 5/)).toBeInTheDocument();
-    expect(screen.getByText(/0 0 0 0/)).toBeInTheDocument();
+    expect(screen.getByText(/esgotou em 3 tentativas/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 0 0 0/)).toHaveClass("custom-game-guess-chip-loss");
   });
 
   it("chama setRodadaAberta ao clicar em Jogar rodada", () => {
-    const setRodadaAberta = jest.fn();
+    const setRodadaAberta = vi.fn();
     render(
       <CustomRoomRounds
         rodadas={rodadas}
         player={basePlayer}
+        room={permanentRoom}
         setRodadaAberta={setRodadaAberta}
       />
     );
-    const playButtons = screen.getAllByText(/jogar rodada/i);
-    fireEvent.click(playButtons[0]);
+    fireEvent.click(screen.getAllByText(/jogar rodada/i)[0]);
     expect(setRodadaAberta).toHaveBeenCalledWith(1);
   });
 
-  it("exibe rodada jogada mas não finalizada (em andamento)", () => {
+  it("exibe rodada em andamento com botão continuar", () => {
     const player: RoomPlayer = {
       ...basePlayer,
       progresso: [
         {
           rodada: 1,
-          data: new Date().toISOString().slice(0, 10).replace(/-/g, ""),
+          data: today,
           tentativas: 1,
           terminou: false,
           win: false,
@@ -132,14 +137,16 @@ describe("CustomRoomRounds", () => {
       <CustomRoomRounds
         rodadas={rodadas}
         player={player}
+        room={permanentRoom}
         setRodadaAberta={() => {}}
       />
     );
-    expect(screen.getByText(/rodada em andamento/i)).toBeInTheDocument();
+    expect(screen.getByText(/em andamento/i)).toBeInTheDocument();
+    expect(screen.getByText(/continuar rodada/i)).toBeInTheDocument();
     expect(screen.getByText(/1 2 3 4/)).toBeInTheDocument();
   });
 
-  it("não mostra progresso de rodada jogada em data diferente do dia atual", () => {
+  it("não mostra progresso de outro dia", () => {
     const player: RoomPlayer = {
       ...basePlayer,
       progresso: [
@@ -157,53 +164,25 @@ describe("CustomRoomRounds", () => {
       <CustomRoomRounds
         rodadas={rodadas}
         player={player}
+        room={permanentRoom}
         setRodadaAberta={() => {}}
       />
     );
-    expect(
-      screen.getByText(/você ainda não jogou esta rodada/i)
-    ).toBeInTheDocument();
+    expect(screen.getAllByText(/não iniciada/i)).toHaveLength(2);
     expect(screen.queryByText(/9 9 9 9/)).not.toBeInTheDocument();
   });
 
-  it("lida com rodada com progresso faltando campos opcionais", () => {
-    // Simula progresso com palpites undefined
-    const player: RoomPlayer = {
-      ...basePlayer,
-      progresso: [
-        {
-          rodada: 2,
-          data: new Date().toISOString().slice(0, 10).replace(/-/g, ""),
-          tentativas: 1,
-          terminou: true,
-          win: false,
-          palpites: undefined,
-        },
-      ],
-    };
-    render(
-      <CustomRoomRounds
-        rodadas={rodadas}
-        player={player}
-        setRodadaAberta={() => {}}
-      />
-    );
-    expect(
-      screen.getByText(/você já perdeu esta rodada hoje/i)
-    ).toBeInTheDocument();
-  });
-
-  it("exibe rodada com palpites vazios", () => {
+  it("mostra progresso legado em sala temporária", () => {
     const player: RoomPlayer = {
       ...basePlayer,
       progresso: [
         {
           rodada: 1,
-          data: new Date().toISOString().slice(0, 10).replace(/-/g, ""),
-          tentativas: 1,
-          terminou: true,
-          win: true,
-          palpites: [],
+          data: "20260527",
+          tentativas: 3,
+          terminou: false,
+          win: false,
+          palpites: ["0000", "1459", "9745"],
         },
       ],
     };
@@ -211,12 +190,11 @@ describe("CustomRoomRounds", () => {
       <CustomRoomRounds
         rodadas={rodadas}
         player={player}
+        room={temporaryRoom}
         setRodadaAberta={() => {}}
       />
     );
-    expect(
-      screen.getByText(/você já ganhou esta rodada hoje/i)
-    ).toBeInTheDocument();
-    // Não deve quebrar se palpites for vazio
+    expect(screen.getByText(/em andamento/i)).toBeInTheDocument();
+    expect(screen.getByText(/continuar rodada/i)).toBeInTheDocument();
   });
 });

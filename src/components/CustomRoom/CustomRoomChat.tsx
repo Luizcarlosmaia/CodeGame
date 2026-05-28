@@ -1,19 +1,7 @@
 import React, { useState } from "react";
 import { useRoomChat } from "../../hooks/useRoomChat";
-import {
-  ChatContainer,
-  ChatTitle,
-  MessagesContainer,
-  EmptyMessage,
-  MessageRow,
-  MessageUser,
-  MessageText,
-  MessageTime,
-  ChatForm,
-  ChatInput,
-  ChatButton,
-  ErrorMsg,
-} from "./CustomRoomChat.styles";
+import { Send } from "lucide-react";
+import { cn } from "../../lib/cn";
 
 interface CustomRoomChatProps {
   roomId: string;
@@ -21,66 +9,108 @@ interface CustomRoomChatProps {
   userName: string;
 }
 
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 const CustomRoomChat: React.FC<CustomRoomChatProps> = ({
   roomId,
   userId,
   userName,
 }) => {
-  const { messages, loading, error, sendMessage } = useRoomChat(roomId);
+  const { messages, loading, sending, error, sendMessage } = useRoomChat(roomId);
   const [text, setText] = useState("");
-
-  // Ref para o container de mensagens
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollTo({
+      top: messagesEndRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (text.trim()) {
-      await sendMessage(userId, userName, text.trim());
-      setText("");
-    }
+  const handleSend = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
+
+    setText("");
+    await sendMessage(userId, userName, trimmed);
   };
 
+  const isInitialLoad = loading && messages.length === 0;
+
   return (
-    <ChatContainer>
-      <ChatTitle>Chat da Sala</ChatTitle>
-      <MessagesContainer ref={messagesEndRef}>
-        {messages.length === 0 && (
-          <EmptyMessage>Nenhuma mensagem ainda.</EmptyMessage>
+    <div className="custom-lobby-chat">
+      <div className="custom-lobby-chat-header">
+        <h3 className="text-sm font-bold text-ink">Chat da sala</h3>
+      </div>
+
+      <div ref={messagesEndRef} className="custom-lobby-chat-messages">
+        {isInitialLoad && (
+          <p className="py-3 text-center text-xs text-ink-muted">Carregando...</p>
         )}
-        {messages.map((msg) => (
-          <MessageRow key={msg.id}>
-            <MessageUser>{msg.userName}:</MessageUser>{" "}
-            <MessageText>{msg.text}</MessageText>
-            <MessageTime>
-              {msg.createdAt.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </MessageTime>
-          </MessageRow>
-        ))}
-      </MessagesContainer>
-      <ChatForm onSubmit={handleSend}>
-        <ChatInput
+
+        {!isInitialLoad && messages.length === 0 && (
+          <p className="py-3 text-center text-xs text-ink-muted">
+            Nenhuma mensagem ainda.
+          </p>
+        )}
+
+        {messages.map((msg, index) => {
+          const isMine = msg.userId === userId;
+          const isPending = msg.id?.startsWith("temp-");
+
+          return (
+            <div
+              key={msg.id ?? `${msg.userId}-${index}`}
+              className={cn(
+                "custom-lobby-chat-line",
+                isMine && "custom-lobby-chat-line-mine",
+                isPending && "opacity-70"
+              )}
+            >
+              <span className="custom-lobby-chat-author">
+                {isMine ? "Você" : msg.userName}
+              </span>
+              <span className="custom-lobby-chat-time">
+                {formatTime(msg.createdAt)}
+              </span>
+              <span className="custom-lobby-chat-text">{msg.text}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <form onSubmit={handleSend} className="custom-lobby-chat-form">
+        <input
           type="text"
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Digite sua mensagem..."
-          disabled={loading}
+          onChange={(event) => setText(event.target.value)}
+          placeholder="Mensagem..."
+          disabled={isInitialLoad}
           maxLength={200}
+          className="input-field custom-lobby-chat-input"
         />
-        <ChatButton type="submit" disabled={loading || !text.trim()}>
-          Enviar
-        </ChatButton>
-      </ChatForm>
-      {error && <ErrorMsg>{error}</ErrorMsg>}
-    </ChatContainer>
+        <button
+          type="submit"
+          disabled={isInitialLoad || sending || !text.trim()}
+          className="custom-lobby-chat-send"
+          aria-label="Enviar mensagem"
+        >
+          <Send size={16} />
+        </button>
+      </form>
+
+      {error && (
+        <p className="custom-lobby-chat-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 };
 

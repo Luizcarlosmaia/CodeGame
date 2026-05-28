@@ -1,52 +1,410 @@
-import React, { useCallback } from "react";
-import CustomRoomEntry from "../components/CustomRoom/CustomRoomEntry";
-import { useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import BackButton from "../components/BackButton";
 import { useCustomRoom } from "../hooks/useCustomRoom";
+import { roomsApi } from "../api/roomsApi";
+import { cn } from "../lib/cn";
+import { getModeLabel } from "../utils/modeLabels";
+import {
+  formatExpiryCountdown,
+  isRoomPlayable,
+} from "../utils/customRoomLifecycle";
+import { fetchMyCustomRooms } from "../utils/customRoomStorage";
+import type { RoomType } from "../types/customRoom";
 
-// Página dedicada: só mostra a tela de entrada/lista, sem abas de criar
+type MyRoom = {
+  id: string;
+  nome: string;
+  modos: { modo: string; rodadas: number }[];
+  type: RoomType;
+  expiraEm?: string;
+};
+
+function getModeIcon(modo: string): string {
+  if (modo === "casual") return "🎨";
+  if (modo === "codigo-mestre") return "🎯";
+  return "🧮";
+}
+
+function normalizeRoomCode(value: string): string {
+  return value.toUpperCase().replace(/\s/g, "").slice(0, 32);
+}
+
 const CustomRoomJoinPage: React.FC = () => {
   const navigate = useNavigate();
   const { joinRoom } = useCustomRoom();
 
-  // Função para entrar na sala pelo código
-  const handleJoin = useCallback(
-    async (roomId: string) => {
-      let thisUserId = localStorage.getItem(`customRoomUserId_${roomId}`);
-      const thisUserName =
-        localStorage.getItem("customRoomUserName") || "Visitante Anônimo";
-      if (!thisUserId) {
-        thisUserId = `user-${Math.random().toString(36).slice(2, 8)}`;
-        localStorage.setItem(`customRoomUserId_${roomId}`, thisUserId);
-      }
-      const joinResult = await joinRoom(roomId, {
-        id: thisUserId,
-        nome: thisUserName,
-        terminouRodada: false,
-        tentativas: [],
-      });
-      if (joinResult === "already_joined") {
-        alert("Você já está participando desta sala.");
-        return "already_joined";
-      }
-      if (joinResult === false) {
-        alert("Erro ao entrar na sala. Tente novamente.");
-        return false;
-      }
-      // Navega para o lobby da sala
+  const [userName, setUserName] = useState(
+    () => localStorage.getItem("customRoomUserName") || ""
+  );
+  const [joinId, setJoinId] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState("");
+  const [shakeInput, setShakeInput] = useState<string | null>(null);
+  const [myRooms, setMyRooms] = useState<MyRoom[]>([]);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+
+  const loadMyRooms = useCallback(async () => {
+    setLoadingRooms(true);
+    try {
+      const rooms = await fetchMyCustomRooms();
+      setMyRooms(
+        rooms.map((room) => ({
+          id: room.id,
+          nome: room.nome || "Sala sem nome",
+          modos: room.modos || [],
+          type: room.type,
+          expiraEm: room.expiraEm,
+        }))
+      );
+    } catch {
+      setMyRooms([]);
+    } finally {
+      setLoadingRooms(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMyRooms();
+  }, [loadMyRooms]);
+
+  const totalMyRooms = myRooms.length;
+
+  const canSubmit =
+    userName.trim().length > 0 && joinId.trim().length > 0 && !joining;
+
+  const triggerValidationFeedback = (field: string) => {
+    setShakeInput(field);
+    if (window.navigator.vibrate) window.navigator.vibrate(120);
+    setTimeout(() => setShakeInput(null), 350);
+  };
+
+  const enterRoom = async (roomId: string) => {
+    let thisUserId = localStorage.getItem(`customRoomUserId_${roomId}`);
+    const trimmedName = userName.trim();
+
+    if (!thisUserId) {
+      thisUserId = `user-${Math.random().toString(36).slice(2, 8)}`;
+      localStorage.setItem(`customRoomUserId_${roomId}`, thisUserId);
+    }
+
+    localStorage.setItem("customRoomUserName", trimmedName);
+
+    const joinResult = await joinRoom(roomId, {
+      id: thisUserId,
+      nome: trimmedName,
+      terminouRodada: false,
+      tentativas: [],
+    });
+
+    if (joinResult === "already_joined" || joinResult === true) {
       navigate(`/custom/lobby/${roomId}`);
       return true;
-    },
-    [navigate, joinRoom]
+    }
+
+    return false;
+  };
+
+  const handleJoin = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (joining) return;
+
+    const code = normalizeRoomCode(joinId);
+
+    if (!userName.trim()) {
+      setError("Digite seu nome para entrar na sala.");
+      triggerValidationFeedback("userName");
+      return;
+    }
+
+    if (!code) {
+      setError("Digite o código da sala.");
+      triggerValidationFeedback("joinId");
+      return;
+    }
+
+    setError("");
+    setShakeInput(null);
+    setJoining(true);
+
+    try {
+      const exists = await roomsApi.roomExists(code);
+      if (!exists) {
+        setError("Sala não encontrada. Verifique o código e tente de novo.");
+        triggerValidationFeedback("joinId");
+        return;
+      }
+
+      const roomPreview = await roomsApi.getRoom(code);
+      if (!roomPreview || !isRoomPlayable(roomPreview)) {
+        setError("Esta sala expirou ou está fechada.");
+        triggerValidationFeedback("joinId");
+        return;
+      }
+
+      const success = await enterRoom(code);
+      if (!success) {
+        setError("Erro ao entrar na sala. Verifique sua conexão e tente de novo.");
+        triggerValidationFeedback("joinId");
+      }
+    } catch {
+      setError("Erro ao entrar na sala. Verifique sua conexão e tente de novo.");
+      triggerValidationFeedback("joinId");
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const modeSummary = useMemo(
+    () =>
+      (modos: MyRoom["modos"]) =>
+        modos.map((entry) => ({
+          ...entry,
+          label: getModeLabel(entry.modo),
+          icon: getModeIcon(entry.modo),
+        })),
+    []
   );
 
   return (
-    <CustomRoomEntry
-      onCreate={() => {}}
-      onJoin={handleJoin}
-      creating={false}
-      forceTab="entrar"
-      hideTabs
-    />
+    <div className="custom-create-page">
+      <div className="h-16" aria-hidden />
+
+      <main className="relative overflow-hidden pb-12">
+        <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+          <div className="absolute -left-24 top-0 size-[420px] rounded-full bg-brand/6 blur-3xl" />
+          <div className="absolute -bottom-24 -right-24 size-[360px] rounded-full bg-success/6 blur-3xl" />
+        </div>
+
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+          <BackButton to="/home" className="mb-4" />
+
+          <div className="mx-auto max-w-3xl text-center lg:mx-0 lg:text-left">
+            <span className="rounded-full bg-brand/10 px-4 py-1.5 text-sm font-semibold tracking-wide text-brand">
+              Multiplayer
+            </span>
+            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
+              Entrar em uma sala
+            </h1>
+            <p className="mt-3 text-base leading-relaxed text-ink-muted sm:text-lg">
+              Use o código que o anfitrião compartilhou ou volte para uma sala
+              em que você já participa.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+            <form
+              onSubmit={handleJoin}
+              autoComplete="off"
+              className="flex flex-col gap-5"
+            >
+              <section className="custom-create-section">
+                <h2 className="custom-create-section-title">Quem é você</h2>
+                <p className="custom-create-section-subtitle">
+                  Esse nome aparece para os outros jogadores na sala.
+                </p>
+
+                <label htmlFor="custom-join-user-name" className="input-label">
+                  Seu nome
+                </label>
+                <input
+                  id="custom-join-user-name"
+                  value={userName}
+                  onChange={(e) => {
+                    setUserName(e.target.value.slice(0, 24));
+                    setError("");
+                  }}
+                  placeholder="Como quer ser chamado?"
+                  maxLength={24}
+                  className={cn(
+                    "input-field",
+                    shakeInput === "userName" && !!error && "shake-anim"
+                  )}
+                />
+              </section>
+
+              <section className="custom-create-section">
+                <h2 className="custom-create-section-title">Código da sala</h2>
+                <p className="custom-create-section-subtitle">
+                  O anfitrião envia um código de 10 caracteres — letras e
+                  números.
+                </p>
+
+                <label htmlFor="custom-join-room-code" className="input-label">
+                  Código
+                </label>
+                <input
+                  id="custom-join-room-code"
+                  value={joinId}
+                  onChange={(e) => {
+                    setJoinId(normalizeRoomCode(e.target.value));
+                    setError("");
+                  }}
+                  placeholder="Ex.: A3K9M2PLQ1"
+                  maxLength={32}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={cn(
+                    "input-field font-mono text-lg tracking-widest uppercase",
+                    shakeInput === "joinId" && !!error && "shake-anim"
+                  )}
+                />
+                <p className="mt-1.5 text-right text-xs text-ink-muted">
+                  {joinId.length} caracteres
+                </p>
+              </section>
+
+              {error && (
+                <p
+                  className="rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm font-medium text-danger"
+                  role="alert"
+                >
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="btn-success w-full lg:hidden"
+              >
+                {joining ? "Entrando na sala..." : "Entrar no lobby"}
+              </button>
+            </form>
+
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <div className="custom-create-summary">
+                <h2 className="text-lg font-bold text-ink">Minhas salas</h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Salas ativas em que você já participa neste dispositivo.
+                </p>
+
+                {loadingRooms ? (
+                  <div className="mt-5 space-y-3">
+                    {[0, 1].map((item) => (
+                      <div
+                        key={item}
+                        className="custom-join-room-skeleton h-28 animate-pulse rounded-xl"
+                      />
+                    ))}
+                  </div>
+                ) : myRooms.length > 0 ? (
+                  <ul className="mt-5 space-y-3">
+                    {myRooms.map((room) => {
+                      const modes = modeSummary(room.modos);
+                      const totalRodadas = modes.reduce(
+                        (sum, entry) => sum + entry.rodadas,
+                        0
+                      );
+
+                      return (
+                        <li key={room.id}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/custom/lobby/${room.id}`)}
+                            className="custom-join-room-card w-full text-left"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-base font-bold text-ink">
+                                  {room.nome}
+                                </p>
+                                <p className="mt-1 font-mono text-xs font-semibold tracking-wide text-ink-muted">
+                                  {room.id}
+                                </p>
+                              </div>
+                              <span className="shrink-0 rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-bold text-brand">
+                                {totalRodadas} rod.
+                              </span>
+                            </div>
+
+                            <p className="mt-2 text-xs text-ink-muted">
+                              {room.type === "temporaria" ? (
+                                <>
+                                  Temporária
+                                  {room.expiraEm
+                                    ? ` · ${formatExpiryCountdown(room.expiraEm)}`
+                                    : ""}
+                                </>
+                              ) : (
+                                "Permanente"
+                              )}
+                            </p>
+
+                            {modes.length > 0 ? (
+                              <ul className="mt-3 flex flex-wrap gap-1.5">
+                                {modes.map((entry) => (
+                                  <li
+                                    key={`${room.id}-${entry.modo}`}
+                                    className="custom-join-mode-chip"
+                                  >
+                                    <span aria-hidden>{entry.icon}</span>
+                                    {entry.label} ×{entry.rodadas}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-3 text-xs text-ink-muted">
+                                Sem modos configurados
+                              </p>
+                            )}
+
+                            <span className="mt-3 inline-flex text-sm font-semibold text-brand">
+                              Ir para o lobby →
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="mt-5 rounded-xl bg-background px-4 py-5 text-center">
+                    <p className="text-sm font-medium text-ink">
+                      Nenhuma sala salva ainda
+                    </p>
+                    <p className="mt-1 text-sm text-ink-muted">
+                      Entre com um código ou crie uma nova sala.
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={!canSubmit}
+                  onClick={() => handleJoin()}
+                  className="btn-success mt-6 hidden w-full lg:flex"
+                >
+                  {joining ? "Entrando na sala..." : "Entrar no lobby"}
+                </button>
+
+                <div className="mt-6 border-t border-border/60 pt-5">
+                  <p className="text-sm text-ink-muted">
+                    Quer ser anfitrião?
+                  </p>
+                  <Link
+                    to="/custom/criar"
+                    className="mt-2 inline-flex text-sm font-semibold text-brand hover:text-brand-hover"
+                  >
+                    Criar uma sala personalizada →
+                  </Link>
+                </div>
+
+                {!loadingRooms && totalMyRooms > 0 && (
+                  <button
+                    type="button"
+                    onClick={loadMyRooms}
+                    className="mt-4 w-full text-sm font-medium text-ink-muted transition-colors hover:text-brand"
+                  >
+                    Atualizar lista
+                  </button>
+                )}
+              </div>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 };
 

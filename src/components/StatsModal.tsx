@@ -1,48 +1,18 @@
-// Componente para animar a largura da barra
-const AnimatedBarFill: React.FC<{
-  width: number;
-  delay: number;
-  children: React.ReactNode;
-}> = ({ width, delay, children }) => {
-  const [animatedWidth, setAnimatedWidth] = React.useState(0);
-  React.useEffect(() => {
-    const timeout = setTimeout(() => {
-      setAnimatedWidth(width);
-    }, delay);
-    return () => clearTimeout(timeout);
-  }, [width, delay]);
-  return <BarFill $width={animatedWidth}>{children}</BarFill>;
-};
-// src/components/StatsModal.tsx
 import React, { useEffect, useState } from "react";
-import {
-  Overlay,
-  ModalBox,
-  ModalHeader,
-  CloseButton,
-} from "../styles/AppStyles";
-import {
-  StatGrid,
-  StatCard,
-  BarChart,
-  BarRow,
-  BarLabel,
-  BarFill,
-} from "../styles/StatsStyles";
+import { cn } from "../lib/cn";
 import type { Stats } from "../utils/stats";
 
 interface Props {
   stats: Stats;
   maxTries: number;
   onClose: () => void;
-  playedToday?: boolean;
+  gameResult?: "win" | "lose" | null;
 }
 
-// Utilitário para calcular o tempo restante até o próximo reset (meia-noite local)
 function getTimeToNextReset() {
   const now = new Date();
   const tomorrow = new Date(now);
-  tomorrow.setHours(24, 0, 0, 0); // próxima meia-noite
+  tomorrow.setHours(24, 0, 0, 0);
   const diff = tomorrow.getTime() - now.getTime();
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -50,30 +20,70 @@ function getTimeToNextReset() {
   return { hours, minutes, seconds };
 }
 
+function AnimatedBarFill({
+  width,
+  delay,
+  count,
+  isMax,
+}: {
+  width: number;
+  delay: number;
+  count: number;
+  isMax: boolean;
+}) {
+  const [animatedWidth, setAnimatedWidth] = useState(0);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setAnimatedWidth(width), delay);
+    return () => clearTimeout(timeout);
+  }, [width, delay]);
+
+  return (
+    <div className="relative h-7 flex-1 overflow-hidden rounded-lg bg-background">
+      <div
+        className={cn(
+          "flex h-full min-w-7 items-center rounded-lg px-2 text-xs font-bold text-white transition-[width] duration-500 ease-out",
+          isMax ? "bg-brand" : "bg-brand/70"
+        )}
+        style={{ width: `${animatedWidth}%` }}
+      >
+        {count}
+      </div>
+    </div>
+  );
+}
+
 export const StatsModal: React.FC<Props> = ({
   stats,
   maxTries,
   onClose,
-  playedToday,
+  gameResult = null,
 }) => {
-  // Cronômetro para o próximo reset diário
   const [timer, setTimer] = useState(getTimeToNextReset());
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer(getTimeToNextReset());
-    }, 1000);
+    const interval = setInterval(() => setTimer(getTimeToNextReset()), 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   const totalGames = stats.totalGames;
   const winRate =
     totalGames > 0 ? Math.round((stats.totalWins / totalGames) * 100) : 0;
 
-  // Pegar apenas tentativas que realmente ocorreram (não mostrar barras "vazias" após a maior tentativa já usada)
+  const distributionLimit = Number.isFinite(maxTries) ? maxTries : 6;
   const maxTentativasUsadas = Math.max(
     ...Object.keys(stats.distribution).map((k) => Number(k)),
     0
   );
-  const limite = Math.max(maxTentativasUsadas, 1, Math.min(maxTries, 6));
+  const limite = Math.max(maxTentativasUsadas, 1, distributionLimit);
 
   const entries = Array.from({ length: limite }, (_, i) => {
     const tries = i + 1;
@@ -81,163 +91,118 @@ export const StatsModal: React.FC<Props> = ({
     return { tries, count };
   });
 
-  // Novo: maior valor para normalizar largura das barras
   const maxCount = Math.max(...entries.map((e) => e.count), 1);
 
-  // Se for Hard e muitas barras, usar 2 colunas
-  const twoCols = maxTries > 8;
-
-  // Determina se foi vitória, derrota ou só estatística
-  let result: "win" | "lose" | null = null;
-  // Só mostra mensagem se jogou hoje
-  if (playedToday) {
-    if (totalGames > 0) {
-      if (stats.currentStreak > 0 && stats.totalWins === totalGames) {
-        result = "win";
-      } else if (stats.currentStreak === 0 && winRate < 100) {
-        result = "lose";
-      }
-    }
-  }
+  const statCards = [
+    { label: "Jogos", value: String(totalGames) },
+    { label: "Vitórias", value: `${winRate}%` },
+    { label: "Sequência", value: String(stats.currentStreak) },
+    { label: "Recorde", value: String(stats.bestStreak) },
+  ];
 
   return (
-    <Overlay onClick={onClose}>
-      <ModalBox onClick={(e) => e.stopPropagation()}>
-        <ModalHeader>
-          <h2>Progresso</h2>
-          <CloseButton onClick={onClose}>×</CloseButton>
-        </ModalHeader>
-
-        {/* Destaque visual de vitória/derrota */}
-        {result === "win" && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              margin: "0.2em 0 0.7em 0",
-              padding: "0.35em 0.7em 0.35em 0.5em",
-              background: "#e6f7ec",
-              color: "#217a4b",
-              borderRadius: 8,
-              fontSize: "1.04em",
-              fontWeight: 600,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-              minHeight: 0,
-              maxWidth: 320,
-              marginLeft: "auto",
-              marginRight: "auto",
-              transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
-            }}
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="stats-modal-box"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stats-modal-title"
+      >
+        <header className="relative pb-1 pt-1 text-center">
+          <span className="inline-flex rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+            Seu progresso
+          </span>
+          <h2
+            id="stats-modal-title"
+            className="mt-3 text-2xl font-extrabold tracking-tight text-ink"
           >
-            <span style={{ fontSize: "1.5em", marginRight: 6, lineHeight: 1 }}>
-              🎉
-            </span>
+            Estatísticas
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="game-toolbar-btn absolute right-0 top-0"
+            aria-label="Fechar"
+          >
+            ×
+          </button>
+        </header>
+
+        {gameResult === "win" && (
+          <div className="game-result-banner game-result-banner-win mt-4">
+            <span className="text-base leading-none">🎉</span>
             <span>Você acertou o código!</span>
           </div>
         )}
-        {result === "lose" && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              margin: "0.2em 0 0.7em 0",
-              padding: "0.35em 0.7em 0.35em 0.5em",
-              background: "#fbeaea",
-              color: "#a13a3a",
-              borderRadius: 8,
-              fontSize: "1.01em",
-              fontWeight: 600,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-              minHeight: 0,
-              maxWidth: 320,
-              marginLeft: "auto",
-              marginRight: "auto",
-              transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
-            }}
-          >
-            <span style={{ fontSize: "1.5em", marginRight: 6, lineHeight: 1 }}>
-              😞
-            </span>
+        {gameResult === "lose" && (
+          <div className="game-result-banner game-result-banner-lose mt-4">
+            <span className="text-base leading-none">😞</span>
             <span>Não foi dessa vez!</span>
           </div>
         )}
 
-        <div
-          style={{
-            textAlign: "center",
-            margin: "0.5em 0 1em 0",
-            fontSize: "1.05em",
-            color: "#153972",
-            fontWeight: 500,
-          }}
-        >
-          Próximo código em:
-          <span
-            style={{
-              marginLeft: 8,
-              fontVariantNumeric: "tabular-nums",
-              fontWeight: 700,
-            }}
-          >
+        <div className="mt-4 rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-center">
+          <p className="text-sm font-medium text-ink-muted">Próximo código em</p>
+          <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-brand">
             {String(timer.hours).padStart(2, "0")}:
             {String(timer.minutes).padStart(2, "0")}:
             {String(timer.seconds).padStart(2, "0")}
-          </span>
+          </p>
         </div>
 
-        <StatGrid
-          style={{
-            width: "100%",
-            justifyItems: "center",
-            alignItems: "center",
-          }}
-        >
-          <StatCard style={{ textAlign: "center", width: "100%" }}>
-            <span className="label">Jogos</span>
-            <span className="value">{totalGames}</span>
-          </StatCard>
-          <StatCard style={{ textAlign: "center", width: "100%" }}>
-            <span className="label">Vitórias</span>
-            <span className="value">{winRate}%</span>
-          </StatCard>
-          <StatCard style={{ textAlign: "center", width: "100%" }}>
-            <span className="label">Sequência de Vitórias</span>
-            <span className="value">{stats.currentStreak}</span>
-          </StatCard>
-          <StatCard style={{ textAlign: "center", width: "100%" }}>
-            <span className="label">Recorde de Sequência</span>
-            <span className="value">{stats.bestStreak}</span>
-          </StatCard>
-        </StatGrid>
+        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-3">
+          {statCards.map((item) => (
+            <div
+              key={item.label}
+              className="rounded-2xl border border-border/60 bg-surface px-3 py-3 text-center shadow-sm"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                {item.label}
+              </p>
+              <p className="mt-1 text-2xl font-extrabold text-ink">{item.value}</p>
+            </div>
+          ))}
+        </div>
 
-        <h3>Distribuição de Tentativas</h3>
-        <BarChart
-          style={{
-            display: "grid",
-            gridTemplateColumns: twoCols ? "1fr 1fr" : "1fr",
-            gap: "0.5rem 1rem",
-          }}
+        <div className="mt-5">
+          <h3 className="mb-3 text-center text-sm font-semibold text-ink-soft">
+            Distribuição de tentativas
+          </h3>
+          <div className="space-y-2">
+            {entries.map(({ tries, count }, idx) => {
+              const width =
+                maxCount > 0 ? Math.max((count / maxCount) * 100, count > 0 ? 12 : 8) : 8;
+              const delay = 150 + idx * 80;
+              return (
+                <div key={tries} className="flex items-center gap-2.5">
+                  <span className="w-5 text-center text-sm font-bold text-ink-muted">
+                    {tries}
+                  </span>
+                  <AnimatedBarFill
+                    width={width}
+                    delay={delay}
+                    count={count}
+                    isMax={count === maxCount && count > 0}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="btn-success mt-5 w-full py-3 text-base"
         >
-          {entries.map(({ tries, count }, idx) => {
-            // largura proporcional ao maior valor, mínimo 8%
-            const width =
-              maxCount > 0 ? Math.max((count / maxCount) * 100, 8) : 8;
-            const delay = 200 + idx * 120;
-            return (
-              <BarRow key={tries} style={{ alignItems: "center" }}>
-                <BarLabel>{tries}</BarLabel>
-                <AnimatedBarFill width={width} delay={delay}>
-                  {count}
-                </AnimatedBarFill>
-              </BarRow>
-            );
-          })}
-        </BarChart>
-      </ModalBox>
-    </Overlay>
+          Continuar
+        </button>
+      </div>
+    </div>
   );
 };

@@ -4,19 +4,23 @@
   "version": "3.0.3",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k \"npm run dev:api\" \"npm run dev:vite\"",
+    "dev:vite": "vite",
+    "dev:api": "node --watch server/dev-api.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "cleanup:rooms": "node scripts/cleanup-expired-rooms.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",
+    "@tailwindcss/vite": "^4.3.0",
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.0",
-    "seedrandom": "^3.0.5",
-    "styled-components": "^6.1.18"
+    "seedrandom": "^3.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
@@ -29,11 +33,11 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@types/seedrandom": "^3.0.8",
-    "@types/styled-components": "^5.1.34",
     "@types/testing-library__jest-dom": "^5.14.9",
     "@types/testing-library__react": "^10.0.1",
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",

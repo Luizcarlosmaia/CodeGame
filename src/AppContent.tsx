@@ -1,7 +1,10 @@
 // src/AppContent.tsx
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { loadStats, type Mode, type Stats } from "./utils/stats";
+import { loadStats, hasSeenStats, markStatsSeen, type Mode, type Stats } from "./utils/stats";
+import { loadGameState } from "./utils/gameState";
+import { resetAllDailyGameStatesIfNewDay } from "./utils/dailyReset";
+import { useTodayKey } from "./hooks/useTodayKey";
 import { Game } from "./components/Game";
 import HelpPage from "./components/HelpModal";
 import DailyChallenges from "./pages/DailyChallenges";
@@ -9,58 +12,38 @@ import { StatsModal } from "./components/StatsModal";
 import Home from "./components/Home";
 import { MainMenu } from "./components/MainMenu";
 
-import styled from "styled-components";
 import CustomRoomFlow from "./components/CustomRoom/CustomRoomFlow";
 import CustomRoomGame from "./components/CustomRoom/CustomRoomGame";
 import CustomRoomCreatePage from "./pages/CustomRoomCreatePage";
 import CustomRoomJoinPage from "./pages/CustomRoomJoinPage";
-const CustomPageWrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 90vh;
-  width: 100%;
-  background: #f7f9fa;
-  padding: 0.1rem;
-  box-sizing: border-box;
-  @media (max-width: 899px) {
-    padding: 0.2rem;
-  }
-`;
+import { resolveModeFromPath, getModeMaxTries, isDailyMode } from "./utils/modeLabels";
 
-function isModeFinished(mode: Mode): boolean {
-  // Adapta para considerar "codigo-mestre" e tentativas específicas
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  let maxTries = 6;
-  if (mode === "desafio") maxTries = 15;
-  else if (mode === "codigo-mestre") maxTries = 7;
-  else if (mode === "custom") maxTries = Infinity;
-  if (mode !== "casual" && mode !== "desafio" && mode !== "codigo-mestre")
-    return false;
-  try {
-    const gameState = JSON.parse(
-      localStorage.getItem(`codeGameState-${mode}`) || "{}"
-    );
-    if (gameState.date !== today) return false;
-    if (!Array.isArray(gameState.guesses) || gameState.guesses.length === 0)
-      return false;
-    if (gameState.hasWon === true) return true;
-    if (gameState.guesses.length >= maxTries) return true;
-    return false;
-  } catch {
-    return false;
+function getTodayGameResult(mode: Mode, today: string): "win" | "lose" | null {
+  if (mode !== "casual" && mode !== "desafio" && mode !== "codigo-mestre") {
+    return null;
   }
+
+  const saved = loadGameState(mode);
+  const maxTries = getMaxTriesForMode(mode);
+
+  if (saved.date !== today || saved.guesses.length === 0) return null;
+  if (saved.hasWon) return "win";
+  if (saved.guesses.length >= maxTries) return "lose";
+  return null;
+}
+
+function getMaxTriesForMode(mode: Mode): number {
+  if (isDailyMode(mode)) return getModeMaxTries(mode);
+  return Infinity;
 }
 
 const AppContent: React.FC = () => {
   const location = useLocation();
-  const mode = (location.pathname.replace("/", "") as Mode) || "casual";
+  const pathSegment = location.pathname.replace(/^\//, "").split("/")[0] ?? "";
+  const activeDailyMode = resolveModeFromPath(pathSegment);
 
-  // const [showHelp, setShowHelp] = useState(false);
-  // const [helpTutorial, setHelpTutorial] = useState(false);
-  // Sempre força a checagem ao montar (corrige bug de não mostrar ao recarregar)
   const [showStats, setShowStats] = useState(false);
+  const [gameResult, setGameResult] = useState<"win" | "lose" | null>(null);
   const [statsByMode, setStatsByMode] = useState<Record<Mode, Stats>>({
     casual: loadStats("casual"),
     desafio: loadStats("desafio"),
@@ -68,57 +51,79 @@ const AppContent: React.FC = () => {
     "codigo-mestre": loadStats("codigo-mestre"),
   });
 
-  const handleWin = (newStats: Stats) => {
-    setStatsByMode((prev) => ({ ...prev, [mode]: newStats }));
+  const handleDayChange = useCallback(() => {
+    resetAllDailyGameStatesIfNewDay();
+    setStatsByMode({
+      casual: loadStats("casual"),
+      desafio: loadStats("desafio"),
+      custom: loadStats("custom"),
+      "codigo-mestre": loadStats("codigo-mestre"),
+    });
+    setShowStats(false);
+    setGameResult(null);
+  }, []);
+
+  const today = useTodayKey(handleDayChange);
+
+  const closeStats = useCallback(() => {
+    if (activeDailyMode) {
+      markStatsSeen(activeDailyMode, today);
+    }
+    setShowStats(false);
+  }, [activeDailyMode, today]);
+
+  const openStats = useCallback(
+    (result: "win" | "lose" | null = null) => {
+      if (!activeDailyMode) return;
+
+      setStatsByMode((prev) => ({
+        ...prev,
+        [activeDailyMode]: loadStats(activeDailyMode),
+      }));
+      setGameResult(result ?? getTodayGameResult(activeDailyMode, today));
+      setShowStats(true);
+    },
+    [activeDailyMode, today]
+  );
+
+  const handleWin = (newStats: Stats, result?: "win" | "lose") => {
+    if (!activeDailyMode) return;
+
+    setStatsByMode((prev) => ({ ...prev, [activeDailyMode]: newStats }));
+    setGameResult(result ?? getTodayGameResult(activeDailyMode, today));
     setShowStats(true);
   };
 
-  // Sempre que o modo mudar, verifica se deve mostrar o modal automaticamente
   React.useEffect(() => {
-    const stats = loadStats(mode);
-    setStatsByMode((prev) => ({ ...prev, [mode]: stats }));
-    // Só mostra automaticamente se o jogo do dia foi finalizado
-    if (isModeFinished(mode)) {
+    if (!activeDailyMode) {
+      setShowStats(false);
+      setGameResult(null);
+      return;
+    }
+
+    const stats = loadStats(activeDailyMode);
+    setStatsByMode((prev) => ({ ...prev, [activeDailyMode]: stats }));
+
+    const result = getTodayGameResult(activeDailyMode, today);
+    if (result !== null && !hasSeenStats(activeDailyMode, today)) {
+      setGameResult(result);
       setShowStats(true);
+      return;
     }
-  }, [mode]);
 
-  // Observa mudanças no localStorage do gameState do modo atual para exibir o modal automaticamente após vitória/derrota ou recarregamento
-  React.useEffect(() => {
-    function checkGameState() {
-      // Só abre automaticamente se o jogo do dia foi finalizado
-      if (isModeFinished(mode)) {
-        setShowStats(true);
-      }
-    }
-    // storage event só dispara entre abas, então também checa por polling
-    window.addEventListener("storage", checkGameState);
-    const interval = setInterval(checkGameState, 1000);
-    return () => {
-      window.removeEventListener("storage", checkGameState);
-      clearInterval(interval);
-    };
-  }, [mode]);
-
-  // Exibe o tutorial automaticamente se nunca jogou
-  // (Removido: agora só mostra o modal de ajuda ao clicar no botão)
+    setShowStats(false);
+    setGameResult(null);
+  }, [activeDailyMode, today]);
 
   return (
     <>
       <MainMenu />
-      {showStats && (
+      {showStats && activeDailyMode && (
         <StatsModal
-          stats={statsByMode[mode]}
-          maxTries={mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity}
-          onClose={() => setShowStats(false)}
-          playedToday={
-            // Só considera que jogou se houve pelo menos um palpite hoje
-            Array.isArray(statsByMode[mode]?.distribution)
-              ? Object.values(statsByMode[mode]?.distribution || {}).some(
-                  (v) => v > 0
-                )
-              : (statsByMode[mode]?.totalGames ?? 0) > 0
-          }
+          stats={statsByMode[activeDailyMode]}
+          maxTries={getMaxTriesForMode(activeDailyMode)}
+          onClose={closeStats}
+          gameResult={gameResult}
         />
       )}
 
@@ -128,62 +133,80 @@ const AppContent: React.FC = () => {
         <Route path="/ajuda" element={<HelpPage />} />
         <Route path="/desafios" element={<DailyChallenges />} />
         <Route
-          path="/casual"
-          element={<Game mode="casual" onWin={handleWin} />}
+          path="/cores"
+          element={
+            <Game
+              mode="casual"
+              onWin={handleWin}
+              onOpenStats={() => openStats()}
+            />
+          }
         />
+        <Route path="/casual" element={<Navigate to="/cores" replace />} />
         <Route
-          path="/desafio"
-          element={<Game mode="desafio" onWin={handleWin} />}
+          path="/contagem"
+          element={
+            <Game
+              mode="desafio"
+              onWin={handleWin}
+              onOpenStats={() => openStats()}
+            />
+          }
         />
+        <Route path="/desafio" element={<Navigate to="/contagem" replace />} />
         <Route
           path="/codigo-mestre"
           element={
-            <Game mode="codigo-mestre" onWin={handleWin} maxTriesOverride={7} />
+            <Game
+              mode="codigo-mestre"
+              onWin={handleWin}
+              onOpenStats={() => openStats()}
+            />
           }
         />
         {/* Página dedicada para criar sala customizada */}
         <Route
           path="/custom/criar"
           element={
-            <CustomPageWrapper>
+            <div className="custom-page-wrapper">
               <CustomRoomCreatePage />
-            </CustomPageWrapper>
+            </div>
           }
         />
         {/* Página dedicada para entrar/listar salas customizadas */}
         <Route
           path="/custom/entrar"
           element={
-            <CustomPageWrapper>
+            <div className="custom-page-wrapper">
               <CustomRoomJoinPage />
-            </CustomPageWrapper>
+            </div>
           }
         />
         {/* Rota custom com fluxo de entrar/lobby/listar */}
         <Route
           path="/custom"
           element={
-            <CustomPageWrapper>
+            <div className="custom-page-wrapper">
               <CustomRoomFlow />
-            </CustomPageWrapper>
+            </div>
           }
         />
         {/* Rota para lobby de sala permanente por ID */}
         <Route
           path="/custom/lobby/:roomId"
           element={
-            <CustomPageWrapper>
+            <div className="custom-page-wrapper">
               <CustomRoomFlow />
-            </CustomPageWrapper>
+            </div>
           }
         />
         {/* Rota para tela de jogo custom */}
         <Route
           path="/custom/game/:roomId"
           element={
-            <CustomPageWrapper>
+            <div className="custom-page-wrapper">
               <CustomRoomGame />
-            </CustomPageWrapper>
+            </div>
           }
         />
       </Routes>

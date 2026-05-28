@@ -27,6 +27,7 @@ describe("CustomRoomChat", () => {
     vi.spyOn(useRoomChatModule, "useRoomChat").mockReturnValue({
       messages: baseMessages,
       loading: false,
+      sending: false,
       error: null,
       sendMessage: mockSendMessage,
     });
@@ -35,10 +36,10 @@ describe("CustomRoomChat", () => {
 
   it("renders chat title and messages", () => {
     render(<CustomRoomChat roomId="room1" userId="user2" userName="Bob" />);
-    expect(screen.getByText("Chat da Sala")).toBeInTheDocument();
-    expect(screen.getByText("Alice:")).toBeInTheDocument();
+    expect(screen.getByText("Chat da sala")).toBeInTheDocument();
+    expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("Olá!")).toBeInTheDocument();
-    expect(screen.getByText("Bob:")).toBeInTheDocument();
+    expect(screen.getByText("Bob")).toBeInTheDocument();
     expect(screen.getByText("Oi Alice!")).toBeInTheDocument();
   });
 
@@ -46,6 +47,7 @@ describe("CustomRoomChat", () => {
     vi.spyOn(useRoomChatModule, "useRoomChat").mockReturnValue({
       messages: [],
       loading: false,
+      sending: false,
       error: null,
       sendMessage: mockSendMessage,
     });
@@ -55,19 +57,20 @@ describe("CustomRoomChat", () => {
 
   it("disables input and button when loading", () => {
     vi.spyOn(useRoomChatModule, "useRoomChat").mockReturnValue({
-      messages: baseMessages,
+      messages: [],
       loading: true,
+      sending: false,
       error: null,
       sendMessage: mockSendMessage,
     });
     render(<CustomRoomChat roomId="room1" userId="user2" userName="Bob" />);
-    expect(screen.getByPlaceholderText(/digite sua mensagem/i)).toBeDisabled();
+    expect(screen.getByPlaceholderText(/mensagem/i)).toBeDisabled();
     expect(screen.getByRole("button", { name: /enviar/i })).toBeDisabled();
   });
 
   it("calls sendMessage and clears input on submit", async () => {
     render(<CustomRoomChat roomId="room1" userId="user2" userName="Bob" />);
-    const input = screen.getByPlaceholderText(/digite sua mensagem/i);
+    const input = screen.getByPlaceholderText(/mensagem/i);
     fireEvent.change(input, { target: { value: "Nova mensagem" } });
     fireEvent.click(screen.getByRole("button", { name: /enviar/i }));
     await waitFor(() => {
@@ -84,6 +87,7 @@ describe("CustomRoomChat", () => {
     vi.spyOn(useRoomChatModule, "useRoomChat").mockReturnValue({
       messages: baseMessages,
       loading: false,
+      sending: false,
       error: "Erro de chat",
       sendMessage: mockSendMessage,
     });

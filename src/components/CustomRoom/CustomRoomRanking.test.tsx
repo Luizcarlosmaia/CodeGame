@@ -3,6 +3,8 @@ import CustomRoomRanking from "./CustomRoomRanking";
 import type { RoomRanking, RoomPlayer } from "../../types/customRoom";
 
 describe("CustomRoomRanking", () => {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+
   const ranking: RoomRanking[] = [
     { playerId: "1", nome: "Alice", pontos: 10 },
     { playerId: "2", nome: "Bob", pontos: 20 },
@@ -16,7 +18,7 @@ describe("CustomRoomRanking", () => {
       progresso: [
         {
           rodada: 1,
-          data: new Date().toISOString().slice(0, 10).replace(/-/g, ""),
+          data: today,
           tentativas: 2,
           terminou: true,
           win: true,
@@ -45,7 +47,7 @@ describe("CustomRoomRanking", () => {
     expect(screen.getByText(/sem ranking ainda/i)).toBeInTheDocument();
   });
 
-  it("exibe todos os jogadores do ranking", () => {
+  it("exibe apenas jogadores com partida", () => {
     render(
       <CustomRoomRanking
         ranking={ranking}
@@ -55,9 +57,23 @@ describe("CustomRoomRanking", () => {
       />
     );
     expect(screen.getByText(/alice/i)).toBeInTheDocument();
-    expect(screen.getByText(/bob/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^bob$/i)).not.toBeInTheDocument();
     expect(screen.getByText(/10 pts/i)).toBeInTheDocument();
-    expect(screen.getByText(/20 pts/i)).toBeInTheDocument();
+  });
+
+  it("exibe dias e jogos em salas permanentes", () => {
+    render(
+      <CustomRoomRanking
+        ranking={ranking}
+        membros={membros}
+        userId="1"
+        totalRodadas={1}
+        roomType="permanente"
+        roomCreatedAt="2024-01-01T00:00:00Z"
+      />
+    );
+    expect(screen.getByText(/1 dia · 1 jogo/i)).toBeInTheDocument();
+    expect(screen.getByText(/sala ativa há/i)).toBeInTheDocument();
   });
 
   it("destaca o usuário logado", () => {
@@ -70,19 +86,23 @@ describe("CustomRoomRanking", () => {
       />
     );
     const alice = screen.getByText(/alice/i).closest("li");
-    expect(alice).toHaveStyle("color: #388e3c");
-    expect(alice).toHaveStyle("background: #eafbe7");
+    expect(alice).toHaveClass("custom-lobby-ranking-row-you");
   });
 
-  it("exibe (já jogou hoje) se aplicável", () => {
+  it("exibe informações do período de ranking permanente", () => {
     render(
       <CustomRoomRanking
-        ranking={ranking}
-        membros={membros}
+        ranking={[]}
+        membros={[]}
         userId="1"
-        totalRodadas={1}
+        totalRodadas={3}
+        roomType="permanente"
+        roomCreatedAt="2024-01-01T00:00:00Z"
+        rankingPeriodo="semanal"
+        rankingResetEm="2099-01-01T03:00:00.000Z"
       />
     );
-    expect(screen.getByText(/já jogou hoje/i)).toBeInTheDocument();
+    expect(screen.getByText(/ranking semanal/i)).toBeInTheDocument();
+    expect(screen.getByText(/segunda-feira/i)).toBeInTheDocument();
   });
 });

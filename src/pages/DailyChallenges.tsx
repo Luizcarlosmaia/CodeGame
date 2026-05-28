@@ -1,159 +1,306 @@
-import React from "react";
-import styled from "styled-components";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import casualIcon from "../img/casual-icone.png";
-import desafioIcon from "../img/desafio-icone.png";
-import casualIconMobile from "../img/casual-icone-mobile.png";
-import desafioIconMobile from "../img/desafio-icone-mobile.png";
-import codigoMestreIcon from "../img/codigo-mestre-icone.png";
-import codigoMestreIconMobile from "../img/codigo-mestre-icone-mobile.png";
+import { ChallengeModeIllustration } from "../components/ChallengeModeIllustration";
+import { cn } from "../lib/cn";
+import { getModeRoute, MODE_DISPLAY, MODE_MAX_TRIES } from "../utils/modeLabels";
+import { loadGameState, type Mode } from "../utils/gameState";
+import { isDailyChallengeFinished } from "../utils/dailyReset";
+import { loadStats } from "../utils/stats";
+import { useTodayKey } from "../hooks/useTodayKey";
 
-const Wrapper = styled.div`
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 2.5rem 1rem 2rem 1rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
+type ChallengeMode = Extract<Mode, "casual" | "desafio" | "codigo-mestre">;
 
-const Title = styled.h1`
-  font-size: 3rem;
-  font-weight: 800;
-  text-align: center;
-  margin-bottom: 0.7rem;
-  color: #181c24;
-`;
+type ChallengeOption = {
+  id: ChallengeMode;
+  to: string;
+  label: string;
+  subtitle: string;
+  description: string;
+  difficulty: string;
+  maxTries: number;
+  accent: string;
+  difficultyClass: string;
+  recommended?: boolean;
+};
 
-const Subtitle = styled.p`
-  font-size: 1.35rem;
-  color: #444a55;
-  text-align: center;
-  margin-bottom: 2.5rem;
-`;
-
-const Options = styled.div`
-  display: flex;
-  gap: 2.5rem;
-  margin-top: 1.5rem;
-  @media (max-width: 700px) {
-    flex-direction: column;
-    gap: 1.2rem;
-    width: 100%;
+const MODE_META: Record<
+  ChallengeMode,
+  {
+    maxTries: number;
+    accent: string;
+    difficultyClass: string;
+    recommended?: boolean;
   }
-`;
+> = {
+  casual: {
+    maxTries: 6,
+    accent: "bg-success/10 ring-success/20",
+    difficultyClass: "bg-success/10 text-success",
+    recommended: true,
+  },
+  desafio: {
+    maxTries: 15,
+    accent: "bg-brand/10 ring-brand/20",
+    difficultyClass: "bg-brand/10 text-brand",
+  },
+  "codigo-mestre": {
+    maxTries: MODE_MAX_TRIES["codigo-mestre"],
+    accent: "bg-[#f59e0b]/10 ring-[#f59e0b]/20",
+    difficultyClass: "bg-[#f59e0b]/10 text-[#d97706]",
+  },
+};
 
-const OptionCard = styled.button<{ $highlight?: boolean }>`
-  background: ${({ $highlight }) => ($highlight ? "#fffbe9" : "#fff")};
-  border: none;
-  border-radius: 22px;
-  box-shadow: 0 2px 16px #0001;
-  padding: 3.2rem 2.8rem 2.2rem 2.8rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  width: 320px;
-  transition: box-shadow 0.18s, background 0.18s;
-  &:hover {
-    box-shadow: 0 4px 32px #0002;
-    background: ${({ $highlight }) => ($highlight ? "#fff7d1" : "#f7faff")};
-  }
-  @media (max-width: 700px) {
-    flex-direction: row;
-    width: 100%;
-    padding: 1.2rem 1.2rem;
-    justify-content: flex-start;
-    border-radius: 18px;
-  }
-`;
+const options: ChallengeOption[] = (
+  Object.keys(MODE_META) as ChallengeMode[]
+).map((id) => ({
+  id,
+  to: getModeRoute(id),
+  ...MODE_META[id],
+  label: MODE_DISPLAY[id].label,
+  subtitle: MODE_DISPLAY[id].subtitle,
+  description: MODE_DISPLAY[id].description,
+  difficulty: MODE_DISPLAY[id].difficulty,
+}));
 
-const OptionImage = styled.img`
-  width: 160px;
-  height: 360px;
-  margin-bottom: 2.2rem;
-  border-radius: 20%;
-  object-fit: cover;
-  background: #fff;
-  box-shadow: 0 1px 8px #0001;
-  @media (max-width: 700px) {
-    width: 56px;
-    height: 56px;
-    margin-bottom: 0;
-    margin-right: 1.2rem;
-    border-radius: 20%;
-  }
-`;
+type ModeStatus = {
+  status: "completed" | "in_progress" | "new";
+  triesUsed: number;
+  streak: number;
+};
 
-const OptionLabel = styled.div<{ $dark?: boolean }>`
-  font-size: 2.1rem;
-  font-weight: 700;
-  color: ${({ $dark }) => ($dark ? "#23272f" : "#23272f")};
-  text-align: center;
-  margin-top: 0.7rem;
-  @media (max-width: 700px) {
-    font-size: 1.45rem;
-    margin-top: 0;
+function formatTodayDate(): string {
+  const formatted = new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+function getModeStatus(mode: ChallengeMode, today: string): ModeStatus {
+  const saved = loadGameState(mode);
+  const stats = loadStats(mode);
+  const isToday = saved.date === today;
+  const maxTries = MODE_MAX_TRIES[mode];
+
+  if (isToday && isDailyChallengeFinished(mode, today, maxTries)) {
+    return {
+      status: "completed",
+      triesUsed: saved.guesses.length,
+      streak: stats.currentStreak,
+    };
   }
-`;
+
+  if (isToday && saved.guesses.length > 0) {
+    return {
+      status: "in_progress",
+      triesUsed: saved.guesses.length,
+      streak: stats.currentStreak,
+    };
+  }
+
+  return {
+    status: "new",
+    triesUsed: 0,
+    streak: stats.currentStreak,
+  };
+}
+
+function getStatusLabel(status: ModeStatus["status"]): string {
+  if (status === "completed") return "Concluído hoje";
+  if (status === "in_progress") return "Em andamento";
+  return "Novo hoje";
+}
+
+function getActionLabel(status: ModeStatus["status"]): string {
+  if (status === "completed") return "Ver resultado";
+  if (status === "in_progress") return "Continuar";
+  return "Jogar agora";
+}
 
 const DailyChallenges: React.FC = () => {
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 700);
+  const today = useTodayKey();
 
-  React.useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 700);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  const modeStatuses = useMemo(
+    () =>
+      Object.fromEntries(
+        options.map((option) => [
+          option.id,
+          getModeStatus(option.id, today),
+        ])
+      ) as Record<ChallengeMode, ModeStatus>,
+    [today]
+  );
+
+  const completedCount = options.filter(
+    (option) => modeStatuses[option.id].status === "completed"
+  ).length;
 
   return (
-    <Wrapper
-      style={isMobile ? { maxWidth: 420, padding: "1.2rem 0.2rem" } : {}}
-    >
-      <Title
-        style={isMobile ? { fontSize: "2.1rem", marginBottom: "0.3rem" } : {}}
-      >
-        Desafios Diários
-      </Title>
-      <Subtitle
-        style={isMobile ? { fontSize: "1.05rem", marginBottom: "1.2rem" } : {}}
-      >
-        {isMobile
-          ? "Tente descobrir o código em um novo desafio a cada dia."
-          : "Resolva um novo quebra-cabeça de código a cada dia"}
-      </Subtitle>
-      <Options>
-        <OptionCard onClick={() => navigate("/casual")} $highlight={!isMobile}>
-          <OptionImage
-            src={isMobile ? casualIconMobile : casualIcon}
-            alt="Modo Casual"
-          />
-          <OptionLabel $dark={!isMobile}>
-            Casual{isMobile && " - Modo Fácil"}
-          </OptionLabel>
-        </OptionCard>
-        <OptionCard onClick={() => navigate("/desafio")} $highlight={isMobile}>
-          <OptionImage
-            src={isMobile ? desafioIconMobile : desafioIcon}
-            alt="Modo Desafio"
-          />
-          <OptionLabel $dark={isMobile}>
-            Desafio{isMobile && " - Modo Difícil"}
-          </OptionLabel>
-        </OptionCard>
-        <OptionCard
-          onClick={() => navigate("/codigo-mestre")}
-          $highlight={false}
-        >
-          <OptionImage
-            src={isMobile ? codigoMestreIconMobile : codigoMestreIcon}
-            alt="Código Mestre"
-          />
-          <OptionLabel $dark={true}>Código Mestre</OptionLabel>
-        </OptionCard>
-      </Options>
-    </Wrapper>
+    <div className="min-h-screen w-full bg-background">
+      <div className="h-16" aria-hidden />
+
+      <main className="relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+          <div className="absolute -right-24 top-0 size-[420px] rounded-full bg-brand/6 blur-3xl" />
+          <div className="absolute -bottom-24 -left-24 size-[360px] rounded-full bg-success/6 blur-3xl" />
+        </div>
+
+        <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-16">
+          <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+            <span className="rounded-full bg-brand/10 px-4 py-1.5 text-sm font-semibold tracking-wide text-brand">
+              Desafio do dia
+            </span>
+
+            <h1 className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight text-ink sm:text-5xl">
+              Desafios Diários
+            </h1>
+
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg">
+              Um novo código a cada dia. Escolha o modo e tente resolver com o
+              menor número de tentativas.
+            </p>
+
+            <p className="mt-3 text-sm font-medium text-ink-soft sm:text-base">
+              {formatTodayDate()}
+            </p>
+          </div>
+
+          <div className="mx-auto mt-8 flex max-w-5xl flex-col gap-3 sm:mt-10 sm:flex-row sm:items-center sm:justify-between">
+            <div className="rounded-2xl border border-border/60 bg-surface px-5 py-4 shadow-sm">
+              <p className="text-sm font-medium text-ink-muted">
+                Progresso de hoje
+              </p>
+              <p className="mt-1 text-2xl font-extrabold text-ink">
+                {completedCount}{" "}
+                <span className="text-base font-semibold text-ink-muted">
+                  de {options.length} concluídos
+                </span>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate("/ajuda")}
+              className="rounded-xl border border-border bg-surface px-6 py-3.5 text-sm font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
+            >
+              Como funcionam os modos?
+            </button>
+          </div>
+
+          <div className="mx-auto mt-8 grid w-full max-w-5xl gap-5 lg:mt-10 lg:grid-cols-3 lg:gap-6">
+            {options.map((option) => {
+              const modeStatus = modeStatuses[option.id];
+              const statusLabel = getStatusLabel(modeStatus.status);
+              const actionLabel = getActionLabel(modeStatus.status);
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => navigate(option.to)}
+                  aria-label={`${option.label}: ${actionLabel}`}
+                  className={cn(
+                    "group flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-border/60 bg-surface text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+                    option.recommended && "ring-1 ring-success/20"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex min-h-[220px] items-center justify-center px-4 py-6 ring-1 ring-inset sm:px-6 sm:py-8",
+                      option.accent
+                    )}
+                  >
+                    <ChallengeModeIllustration mode={option.id} />
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-5 sm:p-6">
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-bold",
+                          option.difficultyClass
+                        )}
+                      >
+                        {option.difficulty}
+                      </span>
+
+                      {option.recommended && (
+                        <span className="rounded-full bg-success/10 px-3 py-1 text-xs font-bold text-success">
+                          Recomendado
+                        </span>
+                      )}
+
+                      <span
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-semibold",
+                          modeStatus.status === "completed" &&
+                            "bg-success/10 text-success",
+                          modeStatus.status === "in_progress" &&
+                            "bg-brand/10 text-brand",
+                          modeStatus.status === "new" &&
+                            "bg-background text-ink-muted"
+                        )}
+                      >
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium text-ink-muted">
+                        {option.subtitle}
+                      </p>
+                      <h2 className="mt-1 text-xl font-bold text-ink sm:text-2xl">
+                        {option.label}
+                      </h2>
+                    </div>
+
+                    <p className="mt-3 flex-1 text-sm leading-relaxed text-ink-muted sm:text-[0.9375rem]">
+                      {option.description}
+                    </p>
+
+                    <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border/60 pt-4 text-sm">
+                      <span className="rounded-lg bg-background px-3 py-1.5 font-medium text-ink-soft">
+                        Até {option.maxTries} tentativas
+                      </span>
+
+                      {modeStatus.triesUsed > 0 && (
+                        <span className="rounded-lg bg-background px-3 py-1.5 font-medium text-ink-muted">
+                          {modeStatus.triesUsed} usada
+                          {modeStatus.triesUsed === 1 ? "" : "s"}
+                        </span>
+                      )}
+
+                      {modeStatus.streak > 0 && (
+                        <span className="rounded-lg bg-[#fff7d1] px-3 py-1.5 font-medium text-[#b45309]">
+                          🔥 {modeStatus.streak} dia
+                          {modeStatus.streak === 1 ? "" : "s"} seguido
+                          {modeStatus.streak === 1 ? "" : "s"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between gap-3">
+                      <span className="text-base font-semibold text-brand transition-colors group-hover:text-brand-hover">
+                        {actionLabel}
+                      </span>
+                      <span
+                        aria-hidden
+                        className="flex size-9 items-center justify-center rounded-full bg-brand/10 text-brand transition-transform group-hover:translate-x-0.5"
+                      >
+                        →
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </main>
+    </div>
   );
 };
 

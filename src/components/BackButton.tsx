@@ -1,36 +1,38 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { BackButtonStyled } from "./BackButton.styles";
+import { cn } from "../lib/cn";
 
 interface BackButtonProps {
   to?: string;
   ariaLabel?: string;
-  style?: React.CSSProperties;
+  className?: string;
 }
 
 const BackButton: React.FC<BackButtonProps> = ({
   to = "/home",
   ariaLabel = "Voltar",
-  style,
+  className,
 }) => {
   const navigate = useNavigate();
+
   return (
-    <BackButtonStyled
+    <button
       type="button"
       onClick={() => navigate(to)}
       aria-label={ariaLabel}
-      style={style}
+      className={cn(
+        "mt-2.5 inline-flex cursor-pointer items-center border-0 bg-transparent p-0",
+        className
+      )}
     >
-      <span
-        className="back-arrow"
-        style={{ display: "flex", alignItems: "center", marginRight: 4 }}
-      >
+      <span className="mr-1 inline-flex items-center">
         <svg
           width="30"
           height="30"
           viewBox="0 0 22 22"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
+          aria-hidden
         >
           <circle cx="11" cy="11" r="11" fill="#e3eaf5" />
           <path
@@ -42,7 +44,7 @@ const BackButton: React.FC<BackButtonProps> = ({
           />
         </svg>
       </span>
-    </BackButtonStyled>
+    </button>
   );
 };
 

@@ -1,27 +1,43 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import { useCustomRoom } from "../hooks/useCustomRoom";
-import {
-  Label,
-  Input,
-  EntryLoadingBox,
-  EntryErrorMsg,
-} from "../components/CustomRoom/CustomRoomEntry.styles";
-import PrimaryButton from "../components/PrimaryButton";
 import { generateRoomId } from "../utils/generateRoomId";
 import { roomsApi } from "../api/roomsApi";
+import { cn } from "../lib/cn";
+import { getModeLabel, MODE_DISPLAY, getModeMaxTries } from "../utils/modeLabels";
+import type { CustomRoomMode } from "../utils/modeLabels";
+import type { RoomType, RankingPeriodo } from "../types/customRoom";
+import { getTemporaryRoomExpiresAt } from "../utils/customRoomLifecycle";
 import {
-  CreateRoomCard,
-  ModeCounter,
-  ModeIcon,
-  ModeRowStyled,
-  SelectFake,
-} from "./CustomRoomCreatePage.styles";
+  formatRankingPeriodoLabel,
+  getNextRankingResetAt,
+} from "../utils/customRoomRankingPeriod";
 
-const MODES = [
-  { value: "casual", label: "Casual" },
-  { value: "desafio", label: "Desafio" },
+const MODE_OPTIONS: Array<{
+  value: CustomRoomMode;
+  icon: string;
+  accent: string;
+  badgeClass: string;
+}> = [
+  {
+    value: "casual",
+    icon: "🎨",
+    accent: "border-success/30 bg-success/5 hover:border-success/40",
+    badgeClass: "bg-success/10 text-success",
+  },
+  {
+    value: "desafio",
+    icon: "🧮",
+    accent: "border-brand/30 bg-brand/5 hover:border-brand/40",
+    badgeClass: "bg-brand/10 text-brand",
+  },
+  {
+    value: "codigo-mestre",
+    icon: "🎯",
+    accent: "border-accent/30 bg-accent/5 hover:border-accent/40",
+    badgeClass: "bg-accent/10 text-accent",
+  },
 ];
 
 const CustomRoomCreatePage: React.FC = () => {
@@ -32,240 +48,553 @@ const CustomRoomCreatePage: React.FC = () => {
       ? localStorage.getItem("customRoomUserName") || ""
       : ""
   );
-  const [selectedModes, setSelectedModes] = useState<{
-    [modo: string]: number;
-  }>({});
+  const [selectedModes, setSelectedModes] = useState<Record<string, number>>(
+    {}
+  );
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [roomType, setRoomType] = useState<RoomType>("permanente");
+  const [rankingPeriodo, setRankingPeriodo] = useState<RankingPeriodo>("nunca");
+  const [error, setError] = useState("");
   const [shakeInput, setShakeInput] = useState<string | null>(null);
   const { createRoom } = useCustomRoom();
 
-  const handleModeChange = (modo: string, checked: boolean) => {
-    setSelectedModes((prev) =>
-      checked
-        ? { ...prev, [modo]: 1 }
-        : Object.fromEntries(Object.entries(prev).filter(([k]) => k !== modo))
-    );
+  const totalRodadas = useMemo(
+    () => Object.values(selectedModes).reduce((sum, count) => sum + count, 0),
+    [selectedModes]
+  );
+
+  const selectedModeEntries = useMemo(
+    () =>
+      Object.entries(selectedModes).map(([modo, rodadas]) => ({
+        modo: modo as CustomRoomMode,
+        rodadas,
+        label: getModeLabel(modo),
+      })),
+    [selectedModes]
+  );
+
+  const canSubmit =
+    nome.trim().length > 0 &&
+    userName.trim().length > 0 &&
+    totalRodadas > 0 &&
+    !creating;
+
+  const toggleMode = (modo: CustomRoomMode) => {
+    setSelectedModes((prev) => {
+      if (prev[modo] !== undefined) {
+        return Object.fromEntries(
+          Object.entries(prev).filter(([key]) => key !== modo)
+        );
+      }
+      return { ...prev, [modo]: 1 };
+    });
+    setError("");
+  };
+
+  const updateModeRounds = (modo: CustomRoomMode, rodadas: number) => {
+    setSelectedModes((prev) => ({
+      ...prev,
+      [modo]: Math.min(20, Math.max(1, rodadas)),
+    }));
   };
 
   const handleCreate = async () => {
     if (creating) return;
-    let vibrate = false;
+
     if (!nome.trim()) {
       setError("Digite um nome para a sala.");
       setShakeInput("nome");
-      vibrate = true;
     } else if (!userName.trim()) {
-      setError("Digite seu nome.");
+      setError("Digite seu nome para entrar na sala.");
       setShakeInput("userName");
-      vibrate = true;
-    } else if (Object.keys(selectedModes).length === 0) {
-      setError("Selecione pelo menos um modo e defina as rodadas.");
+    } else if (totalRodadas === 0) {
+      setError("Selecione pelo menos um modo de jogo.");
       setShakeInput("modes");
-      vibrate = true;
-    } else if (!Object.values(selectedModes).every((v) => v > 0)) {
-      setError("O número de rodadas deve ser maior que zero.");
-      setShakeInput("modes");
-      vibrate = true;
     } else {
       setError("");
       setShakeInput(null);
       setCreating(true);
       localStorage.setItem("customRoomUserName", userName.trim());
-      // Gera ID único e salva userId
-      let newRoomId = "";
-      let tentativas = 0;
-      const maxTentativas = 10;
-      while (tentativas < maxTentativas) {
-        const candidate = generateRoomId();
-        const exists = await roomsApi.roomExists(candidate);
-        if (!exists) {
-          newRoomId = candidate;
-          break;
+
+      try {
+        let newRoomId = "";
+        for (let tentativas = 0; tentativas < 10; tentativas++) {
+          const candidate = generateRoomId();
+          const exists = await roomsApi.roomExists(candidate);
+          if (!exists) {
+            newRoomId = candidate;
+            break;
+          }
         }
-        tentativas++;
-      }
-      if (!newRoomId) {
-        setError("Erro ao gerar código da sala. Tente novamente.");
-        setCreating(false);
-        return;
-      }
-      const thisUserId = `user-${Math.random().toString(36).slice(2, 8)}`;
-      localStorage.setItem(`customRoomUserId_${newRoomId}`, thisUserId);
-      // Gera rodadas
-      let rodadaIndex = 1;
-      const rodadas = Object.entries(selectedModes).flatMap(([modo, rodadas]) =>
-        Array.from({ length: rodadas }, () => ({
-          rodada: rodadaIndex++,
-          modo,
-          codigo: "",
-          encerrada: false,
-          inicio: "",
-        }))
-      );
-      const customRoom = {
-        id: newRoomId,
-        nome: nome.trim(),
-        type: "permanente" as const,
-        ownerId: thisUserId,
-        admins: [thisUserId],
-        membros: [
-          {
-            id: thisUserId,
-            nome: userName.trim(),
-            terminouRodada: false,
-            tentativas: [],
-          },
-        ],
-        modo: Object.keys(selectedModes)[0] || "casual",
-        rodadaAtual: 1,
-        rodadas,
-        modos: Object.entries(selectedModes).map(([modo, rodadas]) => ({
-          modo,
+
+        if (!newRoomId) {
+          setError("Não foi possível gerar o código da sala. Tente novamente.");
+          return;
+        }
+
+        const thisUserId = `user-${Math.random().toString(36).slice(2, 8)}`;
+        localStorage.setItem(`customRoomUserId_${newRoomId}`, thisUserId);
+
+        let rodadaIndex = 1;
+        const rodadas = Object.entries(selectedModes).flatMap(
+          ([modo, rodadasCount]) =>
+            Array.from({ length: rodadasCount }, () => ({
+              rodada: rodadaIndex++,
+              modo,
+              codigo: "",
+              encerrada: false,
+              inicio: "",
+            }))
+        );
+
+        const customRoom = {
+          id: newRoomId,
+          nome: nome.trim(),
+          type: roomType,
+          ownerId: thisUserId,
+          admins: [thisUserId],
+          membros: [
+            {
+              id: thisUserId,
+              nome: userName.trim(),
+              terminouRodada: false,
+              tentativas: [],
+              progresso: [],
+            },
+          ],
+          modo: Object.keys(selectedModes)[0] || "casual",
+          rodadaAtual: 1,
           rodadas,
-        })),
-        ranking: [],
-        aberta: true,
-        criadaEm: new Date().toISOString(),
-      };
-      await createRoom(customRoom);
-      setTimeout(() => {
-        setCreating(false);
+          modos: Object.entries(selectedModes).map(([modo, rodadasCount]) => ({
+            modo,
+            rodadas: rodadasCount,
+          })),
+          ranking: [],
+          aberta: true,
+          criadaEm: new Date().toISOString(),
+          ...(roomType === "temporaria"
+            ? { expiraEm: getTemporaryRoomExpiresAt(), partidaNumero: 1 }
+            : {
+                rankingPeriodo,
+                ...(rankingPeriodo !== "nunca"
+                  ? { rankingResetEm: getNextRankingResetAt(rankingPeriodo) }
+                  : {}),
+              }),
+        };
+
+        await createRoom(customRoom);
         navigate(`/custom/lobby/${newRoomId}`);
-      }, 2000);
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Erro ao criar a sala. Verifique sua conexão e tente de novo.";
+        setError(message);
+      } finally {
+        setCreating(false);
+      }
+      return;
     }
-    if (vibrate) {
-      if (window.navigator.vibrate) window.navigator.vibrate(120);
-      setTimeout(() => setShakeInput(null), 350);
-    }
+
+    if (window.navigator.vibrate) window.navigator.vibrate(120);
+    setTimeout(() => setShakeInput(null), 350);
   };
 
   return (
-    <CreateRoomCard>
-      <div style={{ marginTop: 16, marginBottom: 8 }}>
-        <BackButton />
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleCreate();
-        }}
-        autoComplete="off"
-      >
-        <Label htmlFor="custom-room-nome">Nome da Sala</Label>
-        <Input
-          id="custom-room-nome"
-          value={nome}
-          onChange={(e) => setNome(e.target.value.slice(0, 20))}
-          placeholder="Sala 1"
-          maxLength={20}
-          $shake={shakeInput === "nome" && !!error}
-          style={{ marginBottom: 16 }}
-        />
+    <div className="custom-create-page">
+      <div className="h-16" aria-hidden />
 
-        <Label htmlFor="custom-room-user-name">Seu nome</Label>
-        <Input
-          id="custom-room-user-name"
-          value={userName}
-          onChange={(e) => setUserName(e.target.value)}
-          placeholder="Digite seu nome"
-          maxLength={24}
-          $shake={shakeInput === "userName" && !!error}
-          style={{ marginBottom: 16 }}
-        />
-
-        <Label htmlFor="custom-room-type">Tipo de Sala</Label>
-        <SelectFake tabIndex={-1} aria-disabled="true">
-          <span role="img" aria-label="Privada" style={{ marginRight: 8 }}>
-            🔒
-          </span>
-          Privada
-        </SelectFake>
-
-        <Label style={{ marginTop: 16 }}>Modos:</Label>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-            marginBottom: 20,
-          }}
-        >
-          {MODES.map((m) => (
-            <ModeRowStyled key={m.value}>
-              <ModeIcon $mode={m.value}>
-                {m.value === "casual" ? "😊" : "⚠️"}
-              </ModeIcon>
-              <span style={{ fontWeight: 600, fontSize: 17, flex: 1 }}>
-                {m.value === "casual" ? "Modo Fácil" : "Modo Difícil"}
-              </span>
-              <ModeCounter>
-                <button
-                  type="button"
-                  aria-label="Diminuir"
-                  disabled={
-                    selectedModes[m.value] === undefined ||
-                    selectedModes[m.value] <= 1
-                  }
-                  onClick={() =>
-                    setSelectedModes((prev) =>
-                      prev[m.value] && prev[m.value] > 1
-                        ? { ...prev, [m.value]: prev[m.value] - 1 }
-                        : prev
-                    )
-                  }
-                >
-                  –
-                </button>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={selectedModes[m.value] || ""}
-                  onChange={(e) => {
-                    const v = Math.max(1, Number(e.target.value));
-                    setSelectedModes((prev) => ({ ...prev, [m.value]: v }));
-                  }}
-                  style={{ width: 36, textAlign: "center" }}
-                  disabled={selectedModes[m.value] === undefined}
-                />
-                <button
-                  type="button"
-                  aria-label="Aumentar"
-                  onClick={() =>
-                    setSelectedModes((prev) => ({
-                      ...prev,
-                      [m.value]: prev[m.value] ? prev[m.value] + 1 : 1,
-                    }))
-                  }
-                >
-                  +
-                </button>
-              </ModeCounter>
-              <input
-                type="checkbox"
-                checked={selectedModes[m.value] !== undefined}
-                onChange={(e) => handleModeChange(m.value, e.target.checked)}
-                style={{ marginLeft: 12 }}
-              />
-            </ModeRowStyled>
-          ))}
+      <main className="relative overflow-hidden pb-12">
+        <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+          <div className="absolute -right-24 top-0 size-[420px] rounded-full bg-brand/6 blur-3xl" />
+          <div className="absolute -bottom-24 -left-24 size-[360px] rounded-full bg-success/6 blur-3xl" />
         </div>
-        <PrimaryButton type="submit" loading={creating} disabled={creating}>
-          Criar Sala
-        </PrimaryButton>
-        {creating && (
-          <EntryLoadingBox>
-            Criando sala permanente...
-            <br />
-            Por favor, aguarde.
-          </EntryLoadingBox>
-        )}
-        {error && (
-          <EntryErrorMsg className="input-error-message">{error}</EntryErrorMsg>
-        )}
-      </form>
-    </CreateRoomCard>
+
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+          <BackButton to="/home" className="mb-4" />
+
+          <div className="mx-auto max-w-3xl text-center lg:mx-0 lg:text-left">
+            <span className="rounded-full bg-brand/10 px-4 py-1.5 text-sm font-semibold tracking-wide text-brand">
+              Multiplayer
+            </span>
+            <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
+              Criar sala personalizada
+            </h1>
+            <p className="mt-3 text-base leading-relaxed text-ink-muted sm:text-lg">
+              Monte uma partida privada com amigos, escolha os modos e quantas
+              rodadas de cada um.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-6 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleCreate();
+              }}
+              autoComplete="off"
+              className="flex flex-col gap-5"
+            >
+              <section className="custom-create-section">
+                <h2 className="custom-create-section-title">Quem é você</h2>
+                <p className="custom-create-section-subtitle">
+                  Esse nome aparece para os outros jogadores na sala.
+                </p>
+
+                <label htmlFor="custom-room-user-name" className="input-label">
+                  Seu nome
+                </label>
+                <input
+                  id="custom-room-user-name"
+                  value={userName}
+                  onChange={(e) => {
+                    setUserName(e.target.value.slice(0, 24));
+                    setError("");
+                  }}
+                  placeholder="Como quer ser chamado?"
+                  maxLength={24}
+                  className={cn(
+                    "input-field",
+                    shakeInput === "userName" && !!error && "shake-anim"
+                  )}
+                />
+              </section>
+
+              <section className="custom-create-section">
+                <h2 className="custom-create-section-title">Sobre a sala</h2>
+                <p className="custom-create-section-subtitle">
+                  Sala privada — só entra quem tiver o código.
+                </p>
+
+                <label htmlFor="custom-room-nome" className="input-label">
+                  Nome da sala
+                </label>
+                <input
+                  id="custom-room-nome"
+                  value={nome}
+                  onChange={(e) => {
+                    setNome(e.target.value.slice(0, 20));
+                    setError("");
+                  }}
+                  placeholder="Ex.: Sala dos amigos"
+                  maxLength={20}
+                  className={cn(
+                    "input-field",
+                    shakeInput === "nome" && !!error && "shake-anim"
+                  )}
+                />
+                <p className="mt-1.5 text-right text-xs text-ink-muted">
+                  {nome.length}/20
+                </p>
+
+                <div className="mt-4 flex items-center gap-3 rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-brand/10 text-lg">
+                    🔒
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">Sala privada</p>
+                    <p className="text-xs text-ink-muted">
+                      Você compartilha o código com quem quiser convidar.
+                    </p>
+                  </div>
+                </div>
+
+                <fieldset className="mt-5">
+                  <legend className="text-sm font-semibold text-ink">
+                    Tipo de sala
+                  </legend>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Permanentes ficam abertas; temporárias duram 5 horas.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      aria-pressed={roomType === "permanente"}
+                      onClick={() => setRoomType("permanente")}
+                      className={cn(
+                        "rounded-xl border px-4 py-3 text-left transition-colors",
+                        roomType === "permanente"
+                          ? "border-brand bg-brand/5 ring-2 ring-brand/20"
+                          : "border-border/60 bg-background hover:border-brand/30"
+                      )}
+                    >
+                      <p className="text-sm font-bold text-ink">Permanente</p>
+                      <p className="mt-1 text-xs text-ink-muted">
+                        Fica disponível enquanto o anfitrião mantiver aberta.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={roomType === "temporaria"}
+                      onClick={() => setRoomType("temporaria")}
+                      className={cn(
+                        "rounded-xl border px-4 py-3 text-left transition-colors",
+                        roomType === "temporaria"
+                          ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                          : "border-border/60 bg-background hover:border-accent/30"
+                      )}
+                    >
+                      <p className="text-sm font-bold text-ink">Temporária (5h)</p>
+                      <p className="mt-1 text-xs text-ink-muted">
+                        Ideal para uma noite de jogo; expira automaticamente.
+                      </p>
+                    </button>
+                  </div>
+                </fieldset>
+
+                {roomType === "permanente" && (
+                  <fieldset className="mt-5">
+                    <legend className="text-sm font-semibold text-ink">
+                      Reset do ranking
+                    </legend>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Define quando os pontos e progresso da competição zeram.
+                    </p>
+                    <div className="mt-3 grid gap-2">
+                      {(
+                        [
+                          ["nunca", "Contínuo", "Sem reset automático."],
+                          ["semanal", "Semanal", "Reinicia toda segunda-feira."],
+                          ["mensal", "Mensal", "Reinicia no dia 1 de cada mês."],
+                        ] as const
+                      ).map(([value, title, hint]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={rankingPeriodo === value}
+                          onClick={() => setRankingPeriodo(value)}
+                          className={cn(
+                            "rounded-xl border px-4 py-3 text-left transition-colors",
+                            rankingPeriodo === value
+                              ? "border-brand bg-brand/5 ring-2 ring-brand/20"
+                              : "border-border/60 bg-background hover:border-brand/30"
+                          )}
+                        >
+                          <p className="text-sm font-bold text-ink">{title}</p>
+                          <p className="mt-1 text-xs text-ink-muted">{hint}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
+              </section>
+
+              <section
+                className={cn(
+                  "custom-create-section",
+                  shakeInput === "modes" && !!error && "shake-anim"
+                )}
+              >
+                <h2 className="custom-create-section-title">Modos e rodadas</h2>
+                <p className="custom-create-section-subtitle">
+                  Toque em um modo para incluir. Ajuste quantas rodadas de cada.
+                </p>
+
+                <div className="mt-1 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {MODE_OPTIONS.map((mode) => {
+                    const selected = selectedModes[mode.value] !== undefined;
+                    const display = MODE_DISPLAY[mode.value];
+                    const rounds = selectedModes[mode.value] ?? 1;
+
+                    return (
+                      <div
+                        key={mode.value}
+                        className={cn(
+                          "custom-create-mode-card transition-all",
+                          selected
+                            ? "custom-create-mode-card-selected ring-2 ring-brand/30"
+                            : mode.accent
+                        )}
+                      >
+                        <button
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => toggleMode(mode.value)}
+                          className="w-full text-left outline-none focus-visible:rounded-xl focus-visible:ring-2 focus-visible:ring-brand/40"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-2xl" aria-hidden>
+                              {mode.icon}
+                            </span>
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                                mode.badgeClass
+                              )}
+                            >
+                              {display.difficulty}
+                            </span>
+                          </div>
+
+                          <div className="mt-3">
+                            <p className="text-lg font-bold text-ink">
+                              {display.label}
+                            </p>
+                            <p className="mt-0.5 text-sm text-ink-muted">
+                              {display.subtitle}
+                            </p>
+                            <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+                              {display.description}
+                            </p>
+                            <p className="mt-2 text-[11px] font-medium text-ink-muted">
+                              Até {getModeMaxTries(mode.value)} tentativas por
+                              rodada
+                            </p>
+                          </div>
+                        </button>
+
+                        {selected && (
+                          <div className="mt-4 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+                            <span className="text-xs font-semibold text-ink-soft">
+                              Rodadas
+                            </span>
+                            <div className="custom-create-stepper">
+                              <button
+                                type="button"
+                                aria-label={`Diminuir rodadas de ${display.label}`}
+                                disabled={rounds <= 1}
+                                className="custom-create-stepper-btn"
+                                onClick={() =>
+                                  updateModeRounds(mode.value, rounds - 1)
+                                }
+                              >
+                                −
+                              </button>
+                              <span className="custom-create-stepper-value">
+                                {rounds}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label={`Aumentar rodadas de ${display.label}`}
+                                disabled={rounds >= 20}
+                                className="custom-create-stepper-btn"
+                                onClick={() =>
+                                  updateModeRounds(mode.value, rounds + 1)
+                                }
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {error && (
+                <p
+                  className="rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm font-medium text-danger"
+                  role="alert"
+                >
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="btn-success w-full lg:hidden"
+              >
+                {creating ? "Criando sala..." : "Criar sala e ir ao lobby"}
+              </button>
+            </form>
+
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <div className="custom-create-summary">
+                <h2 className="text-lg font-bold text-ink">Resumo da partida</h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Confira antes de criar a sala.
+                </p>
+
+                <dl className="mt-5 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+                    <dt className="text-ink-muted">Anfitrião</dt>
+                    <dd className="font-semibold text-ink">
+                      {userName.trim() || "—"}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+                    <dt className="text-ink-muted">Sala</dt>
+                    <dd className="font-semibold text-ink">
+                      {nome.trim() || "—"}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+                    <dt className="text-ink-muted">Tipo</dt>
+                    <dd className="font-semibold text-ink">
+                      {roomType === "temporaria" ? "Temporária (5h)" : "Permanente"}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+                    <dt className="text-ink-muted">Ranking</dt>
+                    <dd className="font-semibold text-ink">
+                      {roomType === "temporaria"
+                        ? "Por partida"
+                        : formatRankingPeriodoLabel(rankingPeriodo)}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+                    <dt className="text-ink-muted">Total de rodadas</dt>
+                    <dd className="font-semibold text-brand">
+                      {totalRodadas || "—"}
+                    </dd>
+                  </div>
+                </dl>
+
+                {selectedModeEntries.length > 0 ? (
+                  <ul className="mt-4 space-y-2">
+                    {selectedModeEntries.map(({ modo, rodadas, label }) => (
+                      <li
+                        key={modo}
+                        className="flex items-center justify-between rounded-lg bg-background px-3 py-2 text-sm"
+                      >
+                        <span className="font-medium text-ink">{label}</span>
+                        <span className="font-semibold text-ink-muted">
+                          ×{rodadas}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 rounded-lg bg-background px-3 py-3 text-sm text-ink-muted">
+                    Nenhum modo selecionado ainda.
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  disabled={!canSubmit}
+                  onClick={handleCreate}
+                  className="btn-success mt-6 hidden w-full lg:flex"
+                >
+                  {creating ? "Criando sala..." : "Criar sala e ir ao lobby"}
+                </button>
+
+                {creating && (
+                  <p className="mt-4 text-center text-sm font-medium text-brand">
+                    Preparando o lobby...
+                  </p>
+                )}
+
+                <div className="mt-6 border-t border-border/60 pt-5">
+                  <p className="text-sm text-ink-muted">
+                    Já tem um código?
+                  </p>
+                  <Link
+                    to="/custom/entrar"
+                    className="mt-2 inline-flex text-sm font-semibold text-brand hover:text-brand-hover"
+                  >
+                    Entrar em uma sala existente →
+                  </Link>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 };
 

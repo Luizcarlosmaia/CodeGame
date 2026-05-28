@@ -1,24 +1,10 @@
 import React, { useState, useEffect } from "react";
-// Removido import duplicado de useLocation/Navigate
-import { roomsApi } from "../../api/roomsApi";
-import {
-  EntryContainer,
-  Section,
-  Label,
-  Input,
-  EntryPermanentList,
-  EntryPermanentBtn,
-  EntryPermanentItem,
-  EntryPermanentModos,
-  EntryPermanentId,
-  EntryErrorMsg,
-  EntryModoBadge,
-  EntryMainWrapper,
-  EntryFormCol,
-  EntryListCol,
-} from "./CustomRoomEntry.styles";
+import { useLocation, useNavigate } from "react-router-dom";
 import PrimaryButton from "../PrimaryButton";
 import BackButton from "../BackButton";
+import { cn } from "../../lib/cn";
+import { getModeLabel } from "../../utils/modeLabels";
+import { fetchMyCustomRooms } from "../../utils/customRoomStorage";
 interface Props {
   onCreate: (data: {
     nome: string;
@@ -29,8 +15,6 @@ interface Props {
   forceTab?: "criar" | "entrar" | "permanentes";
   hideTabs?: boolean;
 }
-
-import { useLocation, useNavigate } from "react-router-dom";
 
 const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
   onJoin,
@@ -84,25 +68,14 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
       setLoadingPermanent(true);
       const fetchRooms = async () => {
         try {
-          const rooms = await roomsApi.listPermanentRooms();
-          const filtered = rooms
-            .map((room) => ({
+          const rooms = await fetchMyCustomRooms();
+          setPermanentRooms(
+            rooms.map((room) => ({
               id: room.id,
               nome: room.nome || "",
               modos: room.modos || [],
-              aberta: room.aberta,
-              membros: room.membros || [],
             }))
-            .filter((room) => {
-              const userId = localStorage.getItem(`customRoomUserId_${room.id}`);
-              return (
-                room.aberta !== false &&
-                Array.isArray(room.membros) &&
-                !!userId &&
-                room.membros.some((member) => member.id === userId)
-              );
-            });
-          setPermanentRooms(filtered);
+          );
         } catch {
           setPermanentRooms([]);
         } finally {
@@ -121,43 +94,42 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
   }, [tab]);
 
   return (
-    <EntryContainer>
-      <EntryMainWrapper>
-        <EntryFormCol>
-          <div style={{ marginTop: 16, marginBottom: 8 }}>
+    <div className="mt-10 flex w-full max-w-[900px] flex-col items-center rounded-[18px] bg-surface shadow-[0_4px_24px_rgba(0,0,0,0.1)]">
+      <div className="flex w-full max-w-[1500px] flex-wrap items-start justify-center gap-8 px-4 py-4 md:gap-20 md:px-8">
+        <div className="w-full min-w-[280px] max-w-md flex-1">
+          <div className="mb-2 mt-4">
             <BackButton to="/home" />
           </div>
-          <Section
-            style={{
-              background: "#fff",
-              borderRadius: 14,
-              boxShadow: "0 2px 12px 0 rgba(0,0,0,0.07)",
-              padding: 24,
-            }}
-          >
-            <Label>
-              Código da sala <span style={{ color: "#d32f2f" }}>*</span>
-            </Label>
-            <Input
+          <section className="flex w-full flex-col gap-2 rounded-[14px] bg-surface p-4 shadow-[0_2px_12px_rgba(0,0,0,0.07)] sm:p-6">
+            <label className="input-label">
+              Código da sala <span className="text-[#d32f2f]">*</span>
+            </label>
+            <input
               ref={joinInputRef}
               value={joinId}
               onChange={(e) => setJoinId(e.target.value)}
               placeholder="Código da sala"
               maxLength={32}
-              $shake={shakeInput === "joinId" && !!error}
+              className={cn(
+                "input-field mb-3",
+                shakeInput === "joinId" && !!error && "shake-anim"
+              )}
             />
-            <Label style={{ marginTop: 12 }}>
-              Seu nome <span style={{ color: "#d32f2f" }}>*</span>
-            </Label>
-            <Input
+            <label className="input-label mt-3">
+              Seu nome <span className="text-[#d32f2f]">*</span>
+            </label>
+            <input
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               placeholder="Digite seu nome"
               maxLength={24}
-              $shake={shakeInput === "userName" && !!error}
+              className={cn(
+                "input-field mb-3",
+                shakeInput === "userName" && !!error && "shake-anim"
+              )}
             />
             <PrimaryButton
-              style={{ width: "100%", marginTop: 12 }}
+              className="mt-3"
               onClick={async () => {
                 let vibrate = false;
                 if (!userName.trim()) {
@@ -196,63 +168,67 @@ const CustomRoomEntry: React.FC<Props & { creating?: boolean }> = ({
               Entrar
             </PrimaryButton>
             {error && (
-              <EntryErrorMsg className="input-error-message">
+              <p className="mt-2 text-[15px] font-medium text-[#d32f2f]">
                 {error}
-              </EntryErrorMsg>
+              </p>
             )}
-          </Section>
-        </EntryFormCol>
-        <EntryListCol>
-          <Section>
-            <Label>Salas que já sou membro:</Label>
+          </section>
+        </div>
+
+        <div className="w-full min-w-[280px] max-w-xl flex-[1.2]">
+          <section className="flex w-full flex-col gap-2">
+            <label className="input-label">Salas que já sou membro:</label>
             {loadingPermanent && <div>Carregando...</div>}
             {!loadingPermanent && permanentRooms.length === 0 && (
-              <div>Nenhuma sala permanente disponível.</div>
+              <div className="text-ink-muted">
+                Nenhuma sala ativa disponível.
+              </div>
             )}
-            <EntryPermanentList>
+            <ul className="m-0 list-none p-0">
               {permanentRooms.map((room) => (
-                <EntryPermanentItem key={room.id}>
+                <li
+                  key={room.id}
+                  className="mb-2.5 flex flex-col gap-1.5 rounded-[14px] bg-[#fafdff] p-4 shadow-[0_2px_10px_rgba(25,118,210,0.06)] transition-shadow hover:bg-[#f1f7fb] hover:shadow-[0_4px_18px_rgba(25,118,210,0.13)] sm:gap-4"
+                >
                   <div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        width: "100%",
-                      }}
-                    >
+                    <div className="flex w-full items-center justify-between">
                       <b>{room.nome}</b>
-                      <EntryPermanentId>[{room.id}]</EntryPermanentId>
+                      <span className="ml-1 text-[0.73em] font-semibold text-[#b0b8c9]">
+                        [{room.id}]
+                      </span>
                     </div>
-                    <EntryPermanentModos>
+                    <div className="mt-0.5 text-[0.93rem] text-[#7a8ca3]">
                       {Array.isArray(room.modos) && room.modos.length > 0 ? (
                         room.modos.map(
                           (m: { modo: string; rodadas: number }) => (
-                            <EntryModoBadge key={m.modo}>
-                              {m.modo.charAt(0).toUpperCase() + m.modo.slice(1)}{" "}
-                              · {m.rodadas} rodada{m.rodadas === 1 ? "" : "s"}
-                            </EntryModoBadge>
+                            <span
+                              key={m.modo}
+                              className="m-0.5 inline-block rounded-md border border-[#e0e4ea] px-1 py-0.5 text-[0.73em] font-normal text-[#7a8ca3]"
+                            >
+                              {getModeLabel(m.modo)} · {m.rodadas} rodada
+                              {m.rodadas === 1 ? "" : "s"}
+                            </span>
                           )
                         )
                       ) : (
-                        <span style={{ color: "#b0b8c9", fontWeight: 500 }}>
-                          -
-                        </span>
+                        <span className="font-medium text-[#b0b8c9]">-</span>
                       )}
-                    </EntryPermanentModos>
+                    </div>
                   </div>
-                  <EntryPermanentBtn
+                  <button
+                    type="button"
                     onClick={() => navigate(`/custom/lobby/${room.id}`)}
+                    className="mt-1 w-full cursor-pointer rounded-md border-0 bg-[#e3eaf5] py-2.5 text-base font-bold text-brand transition-colors hover:bg-[#d6e3f7] hover:text-[#1251a3]"
                   >
                     Entrar
-                  </EntryPermanentBtn>
-                </EntryPermanentItem>
+                  </button>
+                </li>
               ))}
-            </EntryPermanentList>
-          </Section>
-        </EntryListCol>
-      </EntryMainWrapper>
-    </EntryContainer>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </div>
   );
 };
 

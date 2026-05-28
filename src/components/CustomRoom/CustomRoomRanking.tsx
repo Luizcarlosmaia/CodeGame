@@ -1,153 +1,317 @@
-import React from "react";
-import { RankingList } from "./CustomRoomGame.styles";
-import type { RoomRanking, RoomPlayer } from "../../types/customRoom";
+import React, { useMemo } from "react";
+
+import { cn } from "../../lib/cn";
+
+import type { RoomRanking, RoomPlayer, RoomType, RankingPeriodo } from "../../types/customRoom";
+
+import {
+
+  filterRankingByPlayed,
+
+  formatPlayerPlayStats,
+
+  formatRoomLifetime,
+
+  getPlayerPlayStats,
+
+} from "../../utils/customRoomStats";
+
+import { filterProgressForRoom } from "../../utils/customRoomProgress";
+import {
+  formatRankingPeriodoDescription,
+  formatRankingPeriodoLabel,
+  formatRankingResetCountdown,
+} from "../../utils/customRoomRankingPeriod";
+
+
 
 interface CustomRoomRankingProps {
-  ranking: RoomRanking[];
-  membros: RoomPlayer[];
-  userId: string;
-}
 
-interface CustomRoomRankingProps {
   ranking: RoomRanking[];
+
   membros: RoomPlayer[];
+
   userId: string;
+
   showStatus?: boolean;
+
   totalRodadas: number;
+
+  roomType?: RoomType;
+
+  roomCreatedAt?: string;
+
+  partidaNumero?: number;
+
+  rankingPeriodo?: RankingPeriodo;
+
+  rankingResetEm?: string;
+
 }
+
+
+
+function getMedal(position: number): string | null {
+
+  if (position === 0) return "🥇";
+
+  if (position === 1) return "🥈";
+
+  if (position === 2) return "🥉";
+
+  return null;
+
+}
+
+
 
 const CustomRoomRanking: React.FC<CustomRoomRankingProps> = ({
+
   ranking,
+
   membros,
+
   userId,
+
   showStatus = true,
+
   totalRodadas,
+
+  roomType = "permanente",
+
+  roomCreatedAt,
+
+  partidaNumero,
+
+  rankingPeriodo = "nunca",
+
+  rankingResetEm,
+
 }) => {
-  return ranking && ranking.length > 0 ? (
-    <RankingList>
-      {ranking.map((r, i) => {
-        const pos = `${i + 1}º`;
-        const membro = Array.isArray(membros)
-          ? membros.find((m) => m.id === r.playerId)
-          : undefined;
-        const partidas = membro?.progresso
-          ? new Set(membro.progresso.map((p) => p.data)).size
-          : 0;
-        const isUser = r.playerId === userId;
+  const roomScope =
+    roomType === "temporaria"
+      ? ({ type: "temporaria" as const, partidaNumero })
+      : ({ type: "permanente" as const, partidaNumero: undefined });
 
-        // Status visual (sem jogos, em jogo, concluído) — só do dia atual
-        let statusLabel = "Sem jogos";
-        let statusColor = "#888";
-        let statusBg = "#f1f5fa";
-        if (showStatus && membro?.progresso) {
-          const dataHoje = new Date()
-            .toISOString()
-            .slice(0, 10)
-            .replace(/-/g, "");
-          // Progresso do dia atual
-          const progressoHoje = membro.progresso.filter(
-            (p) => p.data === dataHoje
-          );
-          const concluidasHoje = progressoHoje.filter((p) => p.terminou).length;
-          const jogadasHoje = progressoHoje.length;
-          if (concluidasHoje === totalRodadas && totalRodadas > 0) {
-            statusLabel = "Concluído";
-            statusColor = "#388e3c";
-            statusBg = "#eafbe7";
-          } else if (jogadasHoje > 0) {
-            statusLabel = "Em jogo";
-            statusColor = "#1976d2";
-            statusBg = "#e3eaf5";
-          }
-        }
+  const playedRanking = useMemo(
 
-        return (
-          <RankingItem key={r.playerId} $isUser={isUser} $isFirst={i === 0}>
-            <RankingPos>{pos}</RankingPos>
-            <RankingName>{r.nome}</RankingName>
-            <RankingPartidas>
-              — {partidas} partida{partidas === 1 ? "" : "s"}
-            </RankingPartidas>
-            {showStatus && (
-              <span
-                style={{
-                  color: statusColor,
-                  background: statusBg,
-                  borderRadius: 8,
-                  fontWeight: 700,
-                  fontSize: 10,
-                  marginLeft: 8,
-                  minWidth: 70,
-                  display: "inline-block",
-                  textAlign: "center",
-                }}
-              >
-                {statusLabel}
-              </span>
-            )}
-            <RankingPontos>{r.pontos} pts</RankingPontos>
-          </RankingItem>
-        );
-      })}
-    </RankingList>
-  ) : (
-    <RankingEmpty>Sem ranking ainda.</RankingEmpty>
+    () => filterRankingByPlayed(ranking, membros, roomScope),
+
+    [ranking, membros, roomScope.type, roomScope.partidaNumero]
+
   );
+
+
+
+  const isPermanentRoom = roomType === "permanente";
+
+  const roomLifetime =
+    isPermanentRoom && roomCreatedAt
+      ? formatRoomLifetime(roomCreatedAt)
+      : null;
+  const rankingPeriodLabel = isPermanentRoom
+    ? formatRankingPeriodoLabel(rankingPeriodo)
+    : null;
+  const rankingPeriodHint = isPermanentRoom
+    ? formatRankingPeriodoDescription(rankingPeriodo)
+    : null;
+  const rankingResetLabel =
+    isPermanentRoom && rankingPeriodo !== "nunca"
+      ? formatRankingResetCountdown(rankingResetEm)
+      : null;
+
+  const rankingMeta = (
+    <>
+      {roomLifetime && (
+        <p className="mb-1 text-xs font-medium text-ink-muted">{roomLifetime}</p>
+      )}
+      {rankingPeriodLabel && (
+        <p className="mb-1 text-xs font-semibold text-ink">{rankingPeriodLabel}</p>
+      )}
+      {rankingPeriodHint && (
+        <p className="mb-1 text-xs text-ink-muted">{rankingPeriodHint}</p>
+      )}
+      {rankingResetLabel && (
+        <p className="mb-3 text-xs font-medium text-brand">{rankingResetLabel}</p>
+      )}
+    </>
+  );
+
+  if (!playedRanking.length) {
+    return (
+      <div>
+        {rankingMeta}
+
+        <p className="rounded-xl bg-background px-4 py-5 text-center text-sm text-ink-muted">
+
+          Sem ranking ainda. Quem completar pelo menos uma rodada aparece aqui.
+
+        </p>
+
+      </div>
+
+    );
+
+  }
+
+
+
+  return (
+    <div>
+      {rankingMeta}
+      <ol className="m-0 space-y-2 p-0">
+
+        {playedRanking.map((entry, index) => {
+
+          const medal = getMedal(index);
+
+          const member = Array.isArray(membros)
+
+            ? membros.find((player) => player.id === entry.playerId)
+
+            : undefined;
+
+          const playStats = getPlayerPlayStats(member?.progresso, roomScope);
+
+          const isUser = entry.playerId === userId;
+
+
+
+          let statusLabel = "Sem jogos";
+
+          let statusClass = "bg-background text-ink-muted";
+
+
+
+          if (showStatus && member?.progresso) {
+
+            const progressToday = filterProgressForRoom(
+
+              member.progresso,
+
+              roomScope
+
+            );
+
+            const finishedToday = progressToday.filter(
+
+              (progress) => progress.terminou
+
+            ).length;
+
+            const playedToday = progressToday.length;
+
+
+
+            if (finishedToday === totalRodadas && totalRodadas > 0) {
+
+              statusLabel = "Concluído";
+
+              statusClass = "bg-success/10 text-success";
+
+            } else if (playedToday > 0) {
+
+              statusLabel = "Em jogo";
+
+              statusClass = "bg-brand/10 text-brand";
+
+            }
+
+          }
+
+
+
+          return (
+
+            <li
+
+              key={entry.playerId}
+
+              className={cn(
+
+                "custom-lobby-ranking-row",
+
+                isUser && "custom-lobby-ranking-row-you",
+
+                index === 0 && !isUser && "custom-lobby-ranking-row-leader"
+
+              )}
+
+            >
+
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+
+                <span className="w-7 shrink-0 text-center text-sm font-bold text-ink-muted">
+
+                  {medal ?? `${index + 1}º`}
+
+                </span>
+
+                <div className="min-w-0">
+
+                  <p className="truncate font-semibold text-ink">{entry.nome}</p>
+
+                  <p className="text-xs text-ink-muted">
+
+                    {isPermanentRoom
+
+                      ? formatPlayerPlayStats(playStats)
+
+                      : `${playStats.dias} partida${playStats.dias === 1 ? "" : "s"}`}
+
+                  </p>
+
+                </div>
+
+              </div>
+
+
+
+              <div className="flex shrink-0 flex-col items-end gap-1">
+
+                {showStatus && (
+
+                  <span
+
+                    className={cn(
+
+                      "rounded-full px-2 py-0.5 text-[10px] font-bold",
+
+                      statusClass
+
+                    )}
+
+                  >
+
+                    {statusLabel}
+
+                  </span>
+
+                )}
+
+                <span className="font-mono text-sm font-bold tabular-nums text-brand">
+
+                  {entry.pontos} pts
+
+                </span>
+
+              </div>
+
+            </li>
+
+          );
+
+        })}
+
+      </ol>
+
+    </div>
+
+  );
+
 };
+
+
 
 export default CustomRoomRanking;
 
-// Styled components for ranking items
-import styled from "styled-components";
-
-const RankingItem = styled.li<{
-  $isUser: boolean;
-  $isFirst: boolean;
-}>`
-  margin-bottom: 5px;
-  font-weight: ${({ $isFirst }) => ($isFirst ? 700 : 500)};
-  color: ${({ $isUser, $isFirst }) =>
-    $isUser ? "#388e3c" : $isFirst ? "#1976d2" : "#333"};
-  font-size: 10px;
-  background: ${({ $isUser }) => ($isUser ? "#eafbe7" : "none")};
-  border-radius: ${({ $isUser }) => ($isUser ? 7 : 0)}px;
-  display: flex;
-  align-items: flex-start; // Corrigido aqui
-  gap: 0.2rem;
-`;
-
-const RankingPos = styled.span`
-  min-width: 28px;
-  font-weight: 700;
-  @media (max-width: 800px) {
-    font-size: 9px;
-  }
-`;
-
-const RankingName = styled.span`
-  font-weight: 600;
-  @media (max-width: 800px) {
-    font-size: 9px;
-  }
-`;
-
-const RankingPartidas = styled.span`
-  color: #888;
-  font-size: 10px;
-  margin-left: 2px;
-  @media (max-width: 800px) {
-    font-size: 9px;
-  }
-`;
-
-const RankingPontos = styled.span`
-  margin-left: auto;
-  font-weight: 700;
-  @media (max-width: 800px) {
-    font-size: 9px;
-  }
-`;
-
-const RankingEmpty = styled.div`
-  color: #888;
-`;

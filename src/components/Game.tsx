@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { GuessRow } from "./GuessRow";
 import { generateCode } from "../utils/generateCode";
-import { generateDailyCode } from "../utils/generateDailyCode";
 import {
   loadStats,
   saveStats,
@@ -11,36 +10,52 @@ import {
   todayKey,
 } from "../utils/stats";
 import {
-  SubmitButton,
-  Counter,
-  PageWrapper,
-  Content,
-  Controls,
-  GuessTable,
-  TableHead,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableCell,
-  Badge,
-  Keypad,
-  Key,
-  ActiveIconButton,
-} from "../styles/AppStyles";
+  buildDailyGameStateRecord,
+  isDailyGameMode,
+  resetAllDailyGameStatesIfNewDay,
+  resolveDailyGameState,
+} from "../utils/dailyReset";
+import { useTodayKey } from "../hooks/useTodayKey";
+import { BarChartIcon } from "lucide-react";
+import { getFeedback } from "../utils/getFeedback";
+import { cn } from "../lib/cn";
 import { ActiveInputRow } from "./ActiveInputRow";
 import { CodigoMestreInputRow } from "./CodigoMestreInputRow";
-import { BarChartIcon } from "lucide-react";
-import { StatsModal } from "./StatsModal";
-import { getFeedback } from "../utils/getFeedback";
+import {
+  CodigoMestreFeedback,
+} from "./CodigoMestreFeedback";
 import {
   loadGameState,
   saveGameState,
   type SavedMode,
 } from "../utils/gameState";
+import { getModeDisplay, getModeMaxTries, isDailyMode } from "../utils/modeLabels";
+
+function buildInitialGameState(
+  day: string,
+  testCode?: string[]
+): Record<Mode, SavedMode> {
+  const daily = buildDailyGameStateRecord(day);
+
+  return {
+    casual: testCode ? { ...daily.casual, code: testCode } : daily.casual,
+    desafio: testCode ? { ...daily.desafio, code: testCode } : daily.desafio,
+    "codigo-mestre": testCode
+      ? { ...daily["codigo-mestre"], code: testCode }
+      : daily["codigo-mestre"],
+    custom: {
+      code: testCode || generateCode(),
+      guesses: [],
+      hasWon: false,
+      date: day,
+    },
+  };
+}
 
 interface GameProps {
   mode: Mode;
-  onWin: (stats: Stats) => void;
+  onWin: (stats: Stats, result?: "win" | "lose") => void;
+  onOpenStats?: () => void;
   __testCode?: string[];
   code?: string[];
   guesses?: string[][];
@@ -57,6 +72,7 @@ interface GameProps {
 export const Game: React.FC<GameProps & { backTo?: string }> = ({
   mode,
   onWin,
+  onOpenStats,
   __testCode,
   code: codeProp,
   guesses: guessesProp,
@@ -70,83 +86,56 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
   onBack,
 }) => {
   const [shakeInput, setShakeInput] = useState(false);
-  const [showStats, setShowStats] = useState(false);
   const navigate = useNavigate();
-  const today = todayKey();
+  const isControlledCustom =
+    mode === "custom" && !!(codeProp || guessesProp || hasWonProp);
 
-  const dailyCasual = generateDailyCode(`${today}-casual`);
-  const dailyDesafio = generateDailyCode(`${today}-desafio`);
-  const dailyCodigoMestre = generateDailyCode(
-    `${today}-codigo-mestre`,
-    "codigo-mestre"
-  );
+  const today = useTodayKey(() => {
+    if (isControlledCustom) return;
 
-  // Estado local só para modos não-controlados (casual/desafio)
-  const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() => {
-    const fallback: Record<Mode, SavedMode> = {
-      casual: {
-        code: __testCode || dailyCasual,
-        guesses: [],
-        hasWon: false,
-        date: today,
-      },
-      desafio: {
-        code: __testCode || dailyDesafio,
-        guesses: [],
-        hasWon: false,
-        date: today,
-      },
-      custom: {
-        code: __testCode || generateCode(),
-        guesses: [],
-        hasWon: false,
-        date: today,
-      },
-      "codigo-mestre": {
-        code: __testCode || dailyCodigoMestre,
-        guesses: [],
-        hasWon: false,
-        date: today,
-      },
-    };
-    return (["casual", "desafio", "custom", "codigo-mestre"] as Mode[]).reduce(
-      (acc, m) => {
-        const saved = loadGameState(m);
-        const isToday = saved.date === today;
-        acc[m] = {
-          code:
-            Array.isArray(saved.code) && saved.code.length === 4 && isToday
-              ? saved.code
-              : fallback[m].code,
-          guesses: isToday ? saved.guesses : [],
-          hasWon: isToday ? saved.hasWon : false,
-          date: today,
-        };
-        return acc;
-      },
-      {} as Record<Mode, SavedMode>
-    );
+    const newDay = todayKey();
+    resetAllDailyGameStatesIfNewDay(newDay);
+    setGameState(buildInitialGameState(newDay, __testCode));
+    setInputDigitsState(Array(4).fill(""));
+    setAnimateRow(null);
+    setEntryRow(null);
   });
+
+  const [gameState, setGameState] = useState<Record<Mode, SavedMode>>(() =>
+    buildInitialGameState(todayKey(), __testCode)
+  );
 
   const [animateRow, setAnimateRow] = useState<null | {
     idx: number;
     type: "win" | "lose";
   }>(null);
   const [entryRow, setEntryRow] = useState<null | number>(null);
-  const [, setShowModal] = useState(() => {
-    const guesses = gameState[mode]?.guesses || [];
-    const hasWon = gameState[mode]?.hasWon;
-    const maxTries = mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity;
-    return (
-      guesses.length > 0 && (hasWon || (!hasWon && guesses.length >= maxTries))
-    );
-  });
+
+  useEffect(() => {
+    if (isControlledCustom || !isDailyGameMode(mode)) return;
+
+    const saved = resolveDailyGameState(mode, today);
+    setGameState((prev) => ({ ...prev, [mode]: saved }));
+  }, [mode, today, isControlledCustom]);
 
   // Só salva no localStorage se não for modo controlado
   useEffect(() => {
-    if (mode === "custom" && (codeProp || guessesProp || hasWonProp)) return;
-    saveGameState(mode, gameState[mode]);
-  }, [mode, gameState, codeProp, guessesProp, hasWonProp]);
+    if (isControlledCustom) return;
+
+    const state = gameState[mode];
+    if (isDailyGameMode(mode)) {
+      const stored = loadGameState(mode);
+      const storedHasProgress =
+        stored.date === today &&
+        (stored.hasWon || stored.guesses.length > 0);
+      const stateIsEmpty =
+        state.guesses.length === 0 && !state.hasWon && state.date === today;
+
+      if (storedHasProgress && stateIsEmpty) return;
+    }
+
+    saveGameState(mode, state);
+  }, [mode, gameState, isControlledCustom, today]);
 
   // Input controlado ou não
   // Para codigo-mestre: 4 campos de 0 a 99
@@ -167,8 +156,48 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
 
   const maxTries =
     maxTriesOverride ??
-    (mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity);
+    (isDailyMode(mode) ? getModeMaxTries(mode) : Infinity);
   const isLost = !hasWon && guesses.length >= maxTries;
+  const isCasual = mode === "casual";
+  const isDesafio = mode === "desafio";
+  const isDailyUi = isCasual || isDesafio || isCodigoMestre;
+  const modeDisplay = isDailyUi ? getModeDisplay(mode) : null;
+  const currentAttempt = hasWon || isLost ? guesses.length : guesses.length + 1;
+  const progressPercent = Math.min((guesses.length / maxTries) * 100, 100);
+
+  const renderToolbar = (badge?: React.ReactNode) => (
+    <div className="flex w-full items-center justify-between">
+      <button
+        type="button"
+        onClick={() => {
+          if (onBack) {
+            onBack();
+          } else {
+            navigate(backTo ?? "/desafios");
+          }
+        }}
+        aria-label="Voltar"
+        title="Voltar"
+        className={isCasual ? "game-toolbar-btn" : "game-toolbar-btn"}
+      >
+        ⟵
+      </button>
+      {badge}
+      {onOpenStats ? (
+        <button
+          type="button"
+          onClick={() => onOpenStats()}
+          aria-label="Ver estatísticas"
+          title="Estatísticas"
+          className="game-toolbar-btn text-brand"
+        >
+          <BarChartIcon size={isCasual ? 18 : 20} />
+        </button>
+      ) : (
+        <span className="game-toolbar-btn invisible" aria-hidden />
+      )}
+    </div>
+  );
 
   const handleChange = (val: string, idx: number) => {
     if (hasWon || isLost) return;
@@ -194,12 +223,24 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     const next = [...inputDigits];
     next[idx] = newVal;
     setInputDigits(next);
-    if (newVal && idx < 3) focusField(idx + 1);
+    if (isCodigoMestre) {
+      if (newVal.length === 2 && idx < 3) focusField(idx + 1);
+    } else if (newVal && idx < 3) {
+      focusField(idx + 1);
+    }
   };
 
   const handleGuess = () => {
     if (hasWon || isLost) return;
-    if (inputDigits.some((d) => !d)) {
+
+    let digitsToSubmit = inputDigits;
+    if (isCodigoMestre) {
+      digitsToSubmit = inputDigits.map((d) =>
+        d.length === 1 ? d.padStart(2, "0") : d
+      );
+    }
+
+    if (digitsToSubmit.some((d) => !d)) {
       setShakeInput(false);
       setTimeout(() => setShakeInput(true), 10);
       setTimeout(() => setShakeInput(false), 350);
@@ -210,7 +251,7 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     // Para codigo-mestre, garantir que todos os campos são números válidos 0-99
     if (
       isCodigoMestre &&
-      inputDigits.some(
+      digitsToSubmit.some(
         (d) => isNaN(Number(d)) || Number(d) < 0 || Number(d) > 99
       )
     ) {
@@ -221,7 +262,7 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     }
 
     if (onGuess) {
-      onGuess([...inputDigits]);
+      onGuess([...digitsToSubmit]);
       setInputDigits(Array(4).fill(""));
       focusField();
       return;
@@ -230,15 +271,14 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     // Para codigo-mestre, comparar como string normalizada
     let isCorrect = false;
     if (isCodigoMestre) {
-      isCorrect = inputDigits.every((d, i) => {
+      isCorrect = digitsToSubmit.every((d, i) => {
         const codeVal = secretCode[i];
-        // Normaliza para string sem zeros à esquerda
         return String(Number(d)) === String(Number(codeVal));
       });
     } else {
-      isCorrect = inputDigits.join("") === secretCode.join("");
+      isCorrect = digitsToSubmit.join("") === secretCode.join("");
     }
-    const nextGuesses = [...guesses, [...inputDigits]];
+    const nextGuesses = [...guesses, [...digitsToSubmit]];
 
     setGameState((prev) => ({
       ...prev,
@@ -265,50 +305,54 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
         setTimeout(() => {
           setAnimateRow(null);
           setTimeout(() => {
-            setShowModal(true);
+            const old = loadStats(mode);
+            const used = guesses.length + 1;
+            const s: Stats = {
+              ...old,
+              totalGames: old.totalGames + 1,
+              totalWins: old.totalWins + 1,
+              currentStreak: old.currentStreak + 1,
+              bestStreak: Math.max(old.bestStreak, old.currentStreak + 1),
+              distribution: { ...old.distribution },
+            };
+            s.distribution[used] = (s.distribution[used] || 0) + 1;
+            saveStats(mode, s);
+            onWin(s, "win");
           }, MODAL_DELAY);
-          const old = loadStats(mode);
-          const used = guesses.length + 1;
-          const s: Stats = {
-            ...old,
-            totalGames: old.totalGames + 1,
-            totalWins: old.totalWins + 1,
-            currentStreak: old.currentStreak + 1,
-            bestStreak: Math.max(old.bestStreak, old.currentStreak + 1),
-            distribution: { ...old.distribution },
-          };
-          s.distribution[used] = (s.distribution[used] || 0) + 1;
-          saveStats(mode, s);
-          onWin(s);
         }, ROW_ANIMATION);
       } else if (nextGuesses.length === maxTries) {
         setAnimateRow({ idx: guesses.length, type: "lose" });
         setTimeout(() => {
           setAnimateRow(null);
           setTimeout(() => {
-            setShowModal(true);
+            const old = loadStats(mode);
+            const s: Stats = {
+              ...old,
+              totalGames: old.totalGames + 1,
+              currentStreak: 0,
+              bestStreak: old.bestStreak,
+              distribution: { ...old.distribution },
+            };
+            saveStats(mode, s);
+            onWin(s, "lose");
           }, MODAL_DELAY);
-          const old = loadStats(mode);
-          const s: Stats = {
-            ...old,
-            totalGames: old.totalGames + 1,
-            currentStreak: 0,
-            bestStreak: old.bestStreak,
-            distribution: { ...old.distribution },
-          };
-          saveStats(mode, s);
-          onWin(s);
         }, ROW_ANIMATION);
       }
     }, ENTRY_ANIMATION);
   };
 
+  const handleFormSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (hasWon || isLost || guesses.length >= maxTries) return;
+    if (inputDigits.some((d) => !d)) return;
+    handleGuess();
+  };
+
   let result: "win" | "lose" | null = null;
   let playedToday = false;
-  if (mode === "casual" || mode === "desafio") {
+  if (mode === "casual" || mode === "desafio" || mode === "codigo-mestre") {
     const stats = loadStats(mode);
-    const todayStr = todayKey();
-    // Jogou hoje se stats.date === hoje e stats.totalGames > 0 e terminou o jogo
+    const todayStr = today;
     playedToday =
       stats.date === todayStr && stats.totalGames > 0 && (hasWon || isLost);
     if (playedToday) {
@@ -321,315 +365,372 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
   }
 
   return (
-    <PageWrapper>
-      <Content>
-        <Controls>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: 8,
-              alignItems: "center",
-              marginBottom: 4,
-            }}
-          >
-            <ActiveIconButton
-              onClick={() => {
-                if (onBack) {
-                  onBack();
-                } else {
-                  navigate(backTo ?? "/desafios");
-                }
-              }}
-              aria-label="Voltar"
-              style={{
-                background: "transparent",
-                border: "none",
-                fontSize: "1.7rem",
-                width: 44,
-                height: 44,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              title="Voltar"
-            >
-              <span
-                style={{
-                  fontSize: "1.25rem",
-                  fontWeight: 600,
-                  color: "inherit",
-                }}
-              >
-                ⟵
+    <div
+      className={cn(
+        "game-shell",
+        (isDesafio || isCodigoMestre) && "game-shell-fill"
+      )}
+    >
+      <div
+        className={cn(
+          "game-panel",
+          isDesafio && "game-panel-fill game-panel-desafio",
+          isCodigoMestre && "game-panel-fill game-panel-codigo-mestre"
+        )}
+      >
+        <header className="game-header">
+          {isDailyUi && modeDisplay ? (
+            <>
+              {renderToolbar(
+                <span
+                  className={cn(
+                    "game-toolbar-badge max-w-none",
+                    isCasual && "bg-success/10 text-success",
+                    isDesafio && "bg-brand/10 text-brand",
+                    isCodigoMestre && "bg-[#f59e0b]/10 text-[#d97706]"
+                  )}
+                >
+                  {modeDisplay.badge}
+                </span>
+              )}
+              <div className="mt-1.5 pb-0.5 text-center">
+                <p className="game-attempt-label">
+                  Tentativa {currentAttempt} de {maxTries}
+                </p>
+                {isCasual ? (
+                  <div className="game-progress-track">
+                    {Array.from({ length: maxTries }).map((_, index) => (
+                      <span
+                        key={index}
+                        className={cn(
+                          "game-progress-step",
+                          index < guesses.length
+                            ? hasWon && index === guesses.length - 1
+                              ? "bg-success"
+                              : "bg-brand"
+                            : index === guesses.length && !hasWon && !isLost
+                              ? "bg-brand/40"
+                              : "bg-border/80"
+                        )}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="game-progress-bar mx-auto mt-2 h-1.5 max-w-[260px] overflow-hidden rounded-full bg-border/80">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-300",
+                        isCodigoMestre ? "bg-[#f59e0b]" : "bg-brand"
+                      )}
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {renderToolbar(
+                <span className="game-attempt-label">
+                  Tentativa {currentAttempt} de {maxTries}
+                </span>
+              )}
+            </>
+          )}
+        </header>
+
+        <form
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={handleFormSubmit}
+        >
+        <div
+          className={cn(
+            "game-main",
+            mode === "codigo-mestre" && "justify-center"
+          )}
+        >
+          {playedToday && result === "win" && (
+            <div className="game-result-banner game-result-banner-win">
+              <span className="text-base leading-none">🎉</span>
+              <span>Você acertou o código!</span>
+            </div>
+          )}
+          {playedToday && result === "lose" && (
+            <div className="game-result-banner game-result-banner-lose">
+              <span className="text-base leading-none">😞</span>
+              <span>
+                {isCodigoMestre
+                  ? "Não foi dessa vez! Veja o código abaixo."
+                  : "Não foi dessa vez!"}
               </span>
-            </ActiveIconButton>
-            <ActiveIconButton
-              onClick={() => setShowStats(true)}
-              aria-label="Ver estatísticas"
-              style={{
-                background: "transparent",
-                border: "none",
-                fontSize: "1.7rem",
-                width: 44,
-                height: 44,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              title="Estatísticas"
-            >
-              <BarChartIcon />
-            </ActiveIconButton>
-          </div>
-          <Counter>
-            Tentativa {hasWon || isLost ? guesses.length : guesses.length + 1}{" "}
-            de {mode === "casual" ? 6 : mode === "desafio" ? 15 : "∞"}
-          </Counter>
-        </Controls>
+            </div>
+          )}
 
-        {/* Mensagem de vitória/derrota entre teclado e input, igual StatsModal */}
-        {playedToday && result === "win" && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              padding: "0.35em 0.7em 0.35em 0.5em",
-              background: "#e6f7ec",
-              color: "#217a4b",
-              borderRadius: 8,
-              fontSize: "1em",
-              fontWeight: 600,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-              minHeight: 0,
-              maxWidth: 350,
-              marginLeft: "auto",
-              marginRight: "auto",
-              transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
-            }}
-          >
-            <span style={{ fontSize: "1.5em", marginRight: 6, lineHeight: 1 }}>
-              🎉
-            </span>
-            <span style={{ fontSize: "0.8rem" }}>Você acertou o código!</span>
-          </div>
-        )}
-        {playedToday && result === "lose" && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              padding: "0.35em 0.7em 0.35em 0.5em",
-              background: "#fbeaea",
-              color: "#a13a3a",
-              borderRadius: 8,
-              fontSize: "1em",
-              fontWeight: 600,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-              minHeight: 0,
-              maxWidth: 320,
-              marginLeft: "auto",
-              marginRight: "auto",
-              transition: "all 0.2s cubic-bezier(.4,0,.2,1)",
-            }}
-          >
-            <span style={{ fontSize: "1.5em", marginRight: 6, lineHeight: 1 }}>
-              😞
-            </span>
-            <span>Não foi dessa vez!</span>
-          </div>
-        )}
+          {isCodigoMestre ? (
+            <div className="game-codigo-mestre-main">
+              <CodigoMestreInputRow
+                inputDigits={inputDigits}
+                onChange={handleChange}
+                inputRefs={inputRefs}
+                hasWon={hasWon}
+                isLost={isLost}
+                shakeInput={shakeInput}
+              />
 
-        {/* Inputs grandes, setas e sem histórico apenas no modo codigo-mestre */}
-        {mode === "codigo-mestre" ? (
-          <CodigoMestreInputRow
-            inputDigits={inputDigits}
-            secretCode={secretCode}
-            onChange={handleChange}
-            inputRefs={inputRefs}
-            hasWon={hasWon}
-            isLost={isLost}
-            guessesLength={guesses.length}
-            shakeInput={shakeInput}
-          />
-        ) : (
-          <ActiveInputRow
-            inputDigits={inputDigits}
-            secretCode={secretCode}
-            isCodigoMestre={isCodigoMestre}
-            onChange={handleChange}
-            inputRefs={inputRefs}
-            hasWon={hasWon}
-            isLost={isLost}
-            guessesLength={guesses.length}
-            modoVisual={false}
-            shakeInput={shakeInput}
-          />
-        )}
-        {/* No modo codigo-mestre, não renderiza GuessRow nem histórico */}
-        {mode !== "codigo-mestre" && (
-          <>
-            {mode === "casual" &&
-              Array.from({ length: maxTries }).map((_, i) => {
-                const g = guesses[i] ?? ["", "", "", ""];
-                const animateEntry = entryRow === i && g.some((d) => d !== "");
-                return (
-                  <GuessRow
-                    key={i}
-                    guess={g}
-                    code={secretCode}
-                    mode={mode}
-                    attempt={i + 1}
-                    animate={animateRow?.idx === i}
-                    animationType={animateRow?.type}
-                    animateEntry={animateEntry}
-                    staggerEntry={true}
-                  />
-                );
-              })}
-            {mode === "desafio" && (
-              <>
-                <GuessTable>
-                  <TableHead>
-                    <tr>
-                      <TableHeader>#</TableHeader>
-                      <TableHeader>Palpite</TableHeader>
-                      <TableHeader>Certos</TableHeader>
-                      <TableHeader>Presentes</TableHeader>
-                    </tr>
-                  </TableHead>
-                  <TableBody>
-                    {Array.from({ length: 15 }).map((_, i) => {
+              <CodigoMestreFeedback
+                guesses={guesses}
+                secretCode={secretCode}
+                maxTries={maxTries}
+                hasWon={hasWon}
+                isLost={isLost}
+              />
+
+            </div>
+          ) : (
+            <ActiveInputRow
+              inputDigits={inputDigits}
+              secretCode={secretCode}
+              isCodigoMestre={isCodigoMestre}
+              onChange={handleChange}
+              inputRefs={inputRefs}
+              hasWon={hasWon}
+              isLost={isLost}
+              guessesLength={guesses.length}
+              modoVisual={false}
+              shakeInput={shakeInput}
+              variant={isDailyUi ? "casual" : "default"}
+            />
+          )}
+
+          {!isCodigoMestre && (
+            <>
+              {isCasual && (
+                <>
+                  <div className="game-legend mt-1">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-2.5 rounded-sm bg-[#22c55e]" />
+                      Certo
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-2.5 rounded-sm bg-[#fbbf24]" />
+                      Presente
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-2.5 rounded-sm bg-[#e2e8f0]" />
+                      Ausente
+                    </span>
+                  </div>
+
+                  <div className="game-casual-board mt-1">
+                    {Array.from({ length: maxTries }).map((_, i) => {
+                      const g = guesses[i] ?? ["", "", "", ""];
+                      const animateEntry =
+                        entryRow === i && g.some((d) => d !== "");
+                      const isFilled = i < guesses.length;
+
+                      return (
+                        <div key={i} className="game-casual-row">
+                          <span
+                            className={cn(
+                              "game-casual-row-number",
+                              isFilled ? "text-brand" : "text-ink-muted"
+                            )}
+                          >
+                            {i + 1}
+                          </span>
+                          <div className="game-casual-row-guesses">
+                            <GuessRow
+                              guess={g}
+                              code={secretCode}
+                              mode={mode}
+                              attempt={i + 1}
+                              animate={animateRow?.idx === i}
+                              animationType={animateRow?.type}
+                              animateEntry={animateEntry}
+                              staggerEntry={true}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {isDesafio && (
+                <>
+                  <div className="game-legend mt-1">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-2.5 rounded-sm bg-[#22c55e]" />
+                      Certos no lugar
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-2.5 rounded-sm bg-[#fbbf24]" />
+                      Presentes fora do lugar
+                    </span>
+                  </div>
+
+                  <div className="game-desafio-board mt-1">
+                    <div className="game-desafio-head" aria-hidden>
+                      <span>#</span>
+                      <span>Palpite</span>
+                      <span className="game-desafio-head-stat">Certos</span>
+                      <span className="game-desafio-head-stat">Pres.</span>
+                    </div>
+                    <div className="game-desafio-rows">
+                      {Array.from({ length: maxTries }).map((_, i) => {
                       const g = guesses[i] ?? ["", "", "", ""];
                       const isFilled = i < guesses.length;
                       const { correctPlace, correctDigit } = isFilled
                         ? getFeedback(g, secretCode)
                         : { correctPlace: "-", correctDigit: "-" };
+
                       return (
-                        <TableRow
+                        <div
                           key={i}
-                          $animateEntry={isFilled}
-                          style={{
-                            background: isFilled ? undefined : "#f5f5f5",
-                            color: isFilled ? undefined : "#bbb",
-                            opacity: isFilled ? 1 : 0.7,
-                          }}
+                          className={cn(
+                            "game-desafio-row",
+                            isFilled
+                              ? "game-desafio-row-filled"
+                              : "game-desafio-row-empty",
+                            isFilled && "animate-table-row"
+                          )}
                         >
-                          <TableCell>{i + 1}</TableCell>
-                          <TableCell $palpite>{g.join(" ")}</TableCell>
-                          <TableCell>
-                            <Badge variant="success">{correctPlace}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="warning">{correctDigit}</Badge>
-                          </TableCell>
-                        </TableRow>
+                          <span className="game-desafio-row-number">{i + 1}</span>
+                          <span className="game-desafio-guess font-mono">
+                            {isFilled ? g.join(" ") : "—"}
+                          </span>
+                          <span
+                            className={cn(
+                              "game-desafio-badge",
+                              isFilled
+                                ? "game-desafio-badge-correct"
+                                : "game-desafio-badge-empty"
+                            )}
+                          >
+                            {correctPlace}
+                          </span>
+                          <span
+                            className={cn(
+                              "game-desafio-badge",
+                              isFilled
+                                ? "game-desafio-badge-present"
+                                : "game-desafio-badge-empty"
+                            )}
+                          >
+                            {correctDigit}
+                          </span>
+                        </div>
                       );
                     })}
-                  </TableBody>
-                </GuessTable>
-              </>
-            )}
-          </>
-        )}
-        <div
-          style={{ width: "100%", display: "flex", justifyContent: "center" }}
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        <footer
+          className={cn(
+            "game-controls",
+            (isDesafio || isCodigoMestre) && "game-controls-desafio"
+          )}
         >
-          <Keypad>
-            {[7, 8, 9, 4, 5, 6, 1, 2, 3, 0].map((k) => (
-              <Key
-                key={k}
+          <div className="flex w-full justify-center">
+            <div
+              className={cn(
+                isCasual && "game-keypad-casual",
+                (isDesafio || isCodigoMestre) && "game-keypad-desafio",
+                !isDailyUi && "game-keypad"
+              )}
+            >
+              {[7, 8, 9, 4, 5, 6, 1, 2, 3, 0].map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={cn(
+                    isCasual && "game-key-casual",
+                    (isDesafio || isCodigoMestre) && "game-key-desafio",
+                    !isDailyUi && "game-key"
+                  )}
+                  disabled={hasWon || isLost}
+                  onClick={() => {
+                    if (hasWon || isLost) return;
+                    if (mode === "codigo-mestre") {
+                      let idx = (
+                        window as unknown as { codigoMestreFocus?: number }
+                      ).codigoMestreFocus;
+                      if (typeof idx !== "number" || idx < 0 || idx > 3) {
+                        idx = inputDigits.findIndex((d) => d.length < 2);
+                        if (idx === -1) idx = 0;
+                      }
+                      const current = inputDigits[idx] || "";
+                      if (current.length < 2) {
+                        handleChange(current + String(k), idx);
+                      }
+                    } else {
+                      const idx = inputDigits.indexOf("");
+                      if (idx >= 0) handleChange(String(k), idx);
+                    }
+                  }}
+                >
+                  {k}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={cn(
+                  isCasual && "game-key-casual",
+                  (isDesafio || isCodigoMestre) && "game-key-desafio",
+                  !isDailyUi && "game-key"
+                )}
                 disabled={hasWon || isLost}
                 onClick={() => {
                   if (hasWon || isLost) return;
                   if (mode === "codigo-mestre") {
-                    // Usa o campo focado, se existir, senão o primeiro incompleto
                     let idx = (
                       window as unknown as { codigoMestreFocus?: number }
                     ).codigoMestreFocus;
                     if (typeof idx !== "number" || idx < 0 || idx > 3) {
                       idx = inputDigits.findIndex((d) => d.length < 2);
-                      if (idx === -1) idx = 0;
+                      if (idx === -1) idx = 3;
                     }
                     const current = inputDigits[idx] || "";
-                    if (current.length < 2) {
-                      handleChange(current + String(k), idx);
+                    if (current.length > 0) {
+                      handleChange(current.slice(0, -1), idx);
+                    } else if (idx > 0) {
+                      handleChange("", idx - 1);
                     }
                   } else {
-                    const idx = inputDigits.indexOf("");
-                    if (idx >= 0) handleChange(String(k), idx);
+                    const last = inputDigits
+                      .map((d, j) => (d ? j : -1))
+                      .filter((j) => j >= 0)
+                      .pop();
+                    if (last != null) handleChange("", last);
                   }
                 }}
               >
-                {k}
-              </Key>
-            ))}
-            <Key
-              disabled={hasWon || isLost}
-              onClick={() => {
-                if (hasWon || isLost) return;
-                if (mode === "codigo-mestre") {
-                  let idx = (
-                    window as unknown as { codigoMestreFocus?: number }
-                  ).codigoMestreFocus;
-                  if (typeof idx !== "number" || idx < 0 || idx > 3) {
-                    idx = inputDigits.findIndex((d) => d.length < 2);
-                    if (idx === -1) idx = 3;
-                  }
-                  const current = inputDigits[idx] || "";
-                  if (current.length > 0) {
-                    handleChange(current.slice(0, -1), idx);
-                  } else if (idx > 0) {
-                    handleChange("", idx - 1);
-                  }
-                } else {
-                  const last = inputDigits
-                    .map((d, j) => (d ? j : -1))
-                    .filter((j) => j >= 0)
-                    .pop();
-                  if (last != null) handleChange("", last);
-                }
-              }}
+                ⌫
+              </button>
+            </div>
+          </div>
+          <div className="flex w-full justify-center">
+            <button
+              type="submit"
+              className={cn(
+                isCasual && "game-submit-casual",
+                (isDesafio || isCodigoMestre) && "game-submit-desafio",
+                !isDailyUi && "game-submit"
+              )}
+              disabled={hasWon || isLost || guesses.length >= maxTries}
             >
-              ⌫
-            </Key>
-          </Keypad>
-        </div>
-        <div
-          style={{
-            width: "100%",
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <SubmitButton
-            onClick={handleGuess}
-            disabled={hasWon || isLost || guesses.length >= maxTries}
-          >
-            Enviar
-          </SubmitButton>
-        </div>
-        {/* Modal de estatísticas */}
-        {showStats && (
-          <StatsModal
-            stats={loadStats(mode)}
-            maxTries={
-              mode === "casual" ? 6 : mode === "desafio" ? 15 : Infinity
-            }
-            onClose={() => setShowStats(false)}
-            playedToday={(() => {
-              const stats = loadStats(mode);
-              return Array.isArray(stats?.distribution)
-                ? Object.values(stats?.distribution || {}).some((v) => v > 0)
-                : (stats?.totalGames ?? 0) > 0;
-            })()}
-          />
-        )}
-      </Content>
-    </PageWrapper>
+              {isDailyUi ? "Enviar palpite" : "Enviar"}
+            </button>
+          </div>
+        </footer>
+        </form>
+      </div>
+    </div>
   );
 };

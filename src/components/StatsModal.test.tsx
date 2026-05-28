@@ -1,6 +1,5 @@
 import { screen } from "@testing-library/react";
 import { StatsModal } from "./StatsModal";
-
 import { renderWithTheme } from "../test-utils";
 
 const baseStats = {
@@ -14,29 +13,27 @@ const baseStats = {
 
 describe("StatsModal", () => {
   it("exibe mensagem de vitória", () => {
-    const stats = {
-      ...baseStats,
-      currentStreak: 2,
-      totalWins: 5,
-      totalGames: 5,
-    };
     renderWithTheme(
-      <StatsModal stats={stats} maxTries={6} onClose={() => {}} />
+      <StatsModal
+        stats={baseStats}
+        maxTries={6}
+        onClose={() => {}}
+        gameResult="win"
+      />
     );
     expect(
-      screen.getByText(/Parabéns! Você acertou o código!/i)
+      screen.getByText(/Você acertou o código!/i)
     ).toBeInTheDocument();
   });
 
   it("exibe mensagem de derrota", () => {
-    const stats = {
-      ...baseStats,
-      currentStreak: 0,
-      totalWins: 2,
-      totalGames: 5,
-    };
     renderWithTheme(
-      <StatsModal stats={stats} maxTries={6} onClose={() => {}} />
+      <StatsModal
+        stats={baseStats}
+        maxTries={6}
+        onClose={() => {}}
+        gameResult="lose"
+      />
     );
     expect(screen.getByText(/Não foi dessa vez!/i)).toBeInTheDocument();
   });
@@ -45,16 +42,11 @@ describe("StatsModal", () => {
     renderWithTheme(
       <StatsModal stats={baseStats} maxTries={6} onClose={() => {}} />
     );
-    // Deve renderizar 5 barras (1 a 5)
     for (let i = 1; i <= 5; i++) {
       const value = String(
         baseStats.distribution[i as keyof typeof baseStats.distribution] || 0
       );
-      // Busca apenas divs (BarFill) com o valor esperado
-      const barDivs = screen
-        .getAllByText(value)
-        .filter((el) => el.tagName === "DIV");
-      expect(barDivs.length).toBeGreaterThan(0);
+      expect(screen.getAllByText(value).length).toBeGreaterThan(0);
     }
   });
 });

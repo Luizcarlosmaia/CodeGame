@@ -1,159 +1,289 @@
 import React from "react";
-import type { RoomPlayer } from "../../types/customRoom";
-import {
-  RoundList,
-  RoundItem,
-  RoundCard,
-  RoundTitle,
-  RoundStatus,
-  RoundGuessesLabel,
-  RoundGuessesList,
-  RoundGuess,
-  RoundPlayButton,
-  RoundEmpty,
-} from "./CustomRoomGame.styles";
+
+import { Play, Trophy } from "lucide-react";
+
+import type { CustomRoom, RoomPlayer } from "../../types/customRoom";
+
+import { cn } from "../../lib/cn";
+
+import { getModeLabel } from "../../utils/modeLabels";
+
+import { computeRoundScore } from "../../utils/customRoomStats";
+
+import { findRoundProgress } from "../../utils/customRoomProgress";
+
+import CustomRoomGuessChips from "./CustomRoomGuessChips";
+
+
 
 interface RodadaConfig {
+
   rodada: number;
+
   modo?: string;
+
   codigo?: string;
+
 }
 
+
+
 interface RoundsProps {
+
   rodadas: RodadaConfig[];
+
   player: RoomPlayer | undefined;
+
+  room: Pick<CustomRoom, "type" | "partidaNumero">;
+
   setRodadaAberta: (rodada: number) => void;
+
 }
+
+
+
+function getModeIcon(modo: string): string {
+
+  if (modo === "casual") return "🎨";
+
+  if (modo === "codigo-mestre") return "🎯";
+
+  return "🧮";
+
+}
+
+
 
 export const CustomRoomRounds: React.FC<RoundsProps> = ({
   rodadas,
   player,
+  room,
   setRodadaAberta,
 }) => {
-  function todayKey() {
-    const d = new Date();
-    return d.toISOString().slice(0, 10).replace(/-/g, "");
-  }
-  // Nova lógica: status geral do dia
-  const dataHoje = todayKey();
-
   return (
-    <RoundList>
+
+    <ul className="custom-game-rounds-list">
+
       {rodadas && rodadas.length > 0 ? (
-        <>
-          {rodadas.map((rodada) => {
-            const progresso = player?.progresso?.find(
-              (p) => p.rodada === rodada.rodada && p.data === dataHoje
-            );
-            const tentativas = progresso?.tentativas || 0;
-            const terminou = progresso?.terminou;
-            let statusLabel = "Sem jogos";
-            let statusColor = "#888";
-            let statusBg = "#f1f5fa";
-            if (progresso) {
-              if (terminou) {
-                statusLabel = "Concluído";
-                statusColor = "#388e3c";
-                statusBg = "#eafbe7";
-              } else {
-                statusLabel = "Em jogo";
-                statusColor = "#1976d2";
-                statusBg = "#e3eaf5";
-              }
+
+        rodadas.map((rodada) => {
+
+          const progresso = findRoundProgress(player, rodada.rodada, room);
+
+          const tentativas = progresso?.tentativas || 0;
+
+          const terminou = progresso?.terminou;
+
+          const won = progresso?.win;
+
+          const modo = rodada.modo || "casual";
+
+          const palpites = progresso?.palpites ?? [];
+
+          const roundScore =
+
+            terminou && tentativas > 0
+
+              ? computeRoundScore(modo, tentativas, !!won)
+
+              : 0;
+
+
+
+          let statusLabel = "Não iniciada";
+
+          let statusClass = "custom-game-round-status-new";
+
+
+
+          if (progresso) {
+
+            if (terminou) {
+
+              statusLabel = won ? "Vitória" : "Concluída";
+
+              statusClass = won
+
+                ? "custom-game-round-status-win"
+
+                : "custom-game-round-status-done";
+
+            } else {
+
+              statusLabel = "Em andamento";
+
+              statusClass = "custom-game-round-status-active";
+
             }
-            return (
-              <RoundItem key={rodada.rodada}>
-                <RoundCard>
-                  <RoundTitle
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <span>Rodada {rodada.rodada}</span>
-                    {terminou && rodada.codigo && (
-                      <span
-                        className="codigo-badge"
-                        style={{
-                          fontWeight: 600,
-                          color: "#1976d2",
-                          fontSize: 13,
-                          background: "#e3eaf5",
-                          borderRadius: 6,
-                          padding: "2px 8px",
-                          marginLeft: 0,
-                          letterSpacing: 1,
-                          display: "inline-block",
-                        }}
-                      >
-                        Código: {rodada.codigo}
-                      </span>
+
+          }
+
+
+
+          return (
+
+            <li key={rodada.rodada}>
+
+              <article className="custom-game-round-card">
+
+                <div className="flex items-start justify-between gap-3">
+
+                  <div>
+
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+
+                      Rodada {rodada.rodada}
+
+                    </p>
+
+                    <p className="mt-1 flex items-center gap-1.5 text-base font-bold text-ink">
+
+                      <span aria-hidden>{getModeIcon(modo)}</span>
+
+                      {getModeLabel(modo)}
+
+                    </p>
+
+                  </div>
+
+                  <span
+
+                    className={cn(
+
+                      "custom-game-round-status",
+
+                      statusClass
+
                     )}
-                  </RoundTitle>
-                  <RoundStatus
-                    terminou={!!terminou}
-                    win={!!progresso?.win}
-                    style={{
-                      color: statusColor,
-                      background: statusBg,
-                      borderRadius: 8,
-                      padding: "4px 12px",
-                      display: "inline-block",
-                      fontWeight: 700,
-                      fontSize: 13,
-                      marginBottom: 6,
-                    }}
+
                   >
+
                     {statusLabel}
-                    {terminou && tentativas > 0 && (
-                      <span
-                        style={{
-                          color: "#888",
-                          fontWeight: 400,
-                          marginLeft: 8,
-                          fontSize: 10,
-                        }}
-                      >
-                        ({tentativas} tentativa{tentativas === 1 ? "" : "s"})
+
+                  </span>
+
+                </div>
+
+
+
+                {progresso && !terminou && tentativas > 0 && (
+
+                  <p className="mt-2 text-xs text-ink-muted">
+
+                    {tentativas} tentativa{tentativas === 1 ? "" : "s"} hoje
+
+                  </p>
+
+                )}
+
+
+
+                {terminou && tentativas > 0 && (
+
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+
+                    {won ? (
+                      <span className="inline-flex items-center gap-1 text-success">
+                        <Trophy size={12} aria-hidden />
+                        <span>
+                          {`Acertou em ${tentativas} tentativa${tentativas === 1 ? "" : "s"}`}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-ink-muted">
+                        {`Esgotou em ${tentativas} tentativas`}
                       </span>
                     )}
-                  </RoundStatus>
-                  {terminou &&
-                    progresso?.tentativas &&
-                    progresso.tentativas > 0 &&
-                    progresso?.palpites &&
-                    Array.isArray(progresso.palpites) && (
-                      <div>
-                        <RoundGuessesLabel>Seus palpites:</RoundGuessesLabel>
-                        <RoundGuessesList>
-                          {progresso.palpites.map(
-                            (palpite: string, i: number) => (
-                              <RoundGuess key={i}>
-                                {palpite.split("").join(" ")}
-                              </RoundGuess>
-                            )
-                          )}
-                        </RoundGuessesList>
-                      </div>
+
+                    {roundScore > 0 && (
+
+                      <span className="font-mono font-bold tabular-nums text-brand">
+
+                        +{roundScore} pts
+
+                      </span>
+
                     )}
-                  {!terminou && (
-                    <RoundPlayButton
+
+                  </div>
+
+                )}
+
+
+
+                {palpites.length > 0 && (
+
+                  <div className="mt-2">
+
+                    <p className="custom-game-round-guesses-label">Tentativas</p>
+
+                    <CustomRoomGuessChips
+
+                      palpites={palpites}
+
+                      modo={modo}
+
+                      terminou={!!terminou}
+
+                      won={!!won}
+
+                      className="mt-1"
+
+                    />
+
+                  </div>
+
+                )}
+
+
+
+                {!terminou && (
+
+                  <div className="mt-3">
+
+                    <button
+
+                      type="button"
+
                       data-testid={`play-round-${rodada.rodada}`}
+
                       onClick={() => setRodadaAberta(rodada.rodada)}
+
+                      className="custom-game-round-play"
+
                     >
-                      Jogar rodada
-                    </RoundPlayButton>
-                  )}
-                </RoundCard>
-              </RoundItem>
-            );
-          })}
-        </>
+
+                      <Play size={16} aria-hidden />
+
+                      {progresso ? "Continuar rodada" : "Jogar rodada"}
+
+                    </button>
+
+                  </div>
+
+                )}
+
+              </article>
+
+            </li>
+
+          );
+
+        })
+
       ) : (
-        <RoundEmpty>Nenhuma rodada configurada.</RoundEmpty>
+
+        <li className="custom-create-section text-sm text-ink-muted">
+
+          Nenhuma rodada configurada.
+
+        </li>
+
       )}
-    </RoundList>
+
+    </ul>
+
   );
+
 };
+

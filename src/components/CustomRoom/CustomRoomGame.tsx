@@ -2,26 +2,28 @@ import React, { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useCustomRoom } from "../../hooks/useCustomRoom";
 import { roomsApi } from "../../api/roomsApi";
-import { generateDailyCode } from "../../utils/generateDailyCode";
+import { getCustomRoomDailyCode } from "../../utils/customRoomDailyCode";
 import {
-  RankingCard,
-  RankingTitle,
-  RoomHeader,
-  MainContainer,
-  Card,
-  GameMainWrapper,
-  GameLeftCol,
-  GameRightCol,
-} from "./CustomRoomGame.styles";
+  findRoundProgress,
+  getCustomRoomCodeSessionKey,
+  getCustomRoomProgressKey,
+  removeRoundProgressEntries,
+} from "../../utils/customRoomProgress";
+import { isRoomPlayable } from "../../utils/customRoomLifecycle";
+import {
+  getModeMaxTries,
+  isCustomRoomMode,
+  type CustomRoomMode,
+} from "../../utils/modeLabels";
+import { computeRoomRanking, getRoomAgeDays } from "../../utils/customRoomStats";
 import BackButton from "../BackButton";
 import CustomRoomRanking from "./CustomRoomRanking";
 import { CustomRoomRounds } from "./CustomRoomRounds";
 import CustomRoomRodadaPainel from "./CustomRoomRodadaPainel";
-
-function todayKey() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10).replace(/-/g, "");
-}
+import {
+  parseGuess,
+  serializeGuess,
+} from "./customRoomGuessDisplay";
 
 const CustomRoomGame: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
@@ -85,19 +87,52 @@ const CustomRoomGame: React.FC = () => {
   }, [room, userId, player, joining, joinTried, roomId, joinRoom]);
 
   if (loading || joining) {
-    renderContent = <div>Carregando sala...</div>;
+    renderContent = (
+      <div className="custom-create-page">
+        <div className="h-16" aria-hidden />
+        <div className="mx-auto flex min-h-[50vh] max-w-lg flex-col items-center justify-center px-4 text-center">
+          <div className="custom-lobby-spinner" aria-hidden />
+          <p className="mt-4 text-base font-semibold text-ink">
+            Carregando partida...
+          </p>
+        </div>
+      </div>
+    );
   } else if (error) {
-    renderContent = <div style={{ color: "#d32f2f" }}>{error}</div>;
+    renderContent = (
+      <div className="custom-create-page px-4 py-20">
+        <p className="mx-auto max-w-md rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-center text-sm font-medium text-danger">
+          {error}
+        </p>
+      </div>
+    );
   } else if (!room) {
     renderContent = (
-      <div style={{ color: "#d32f2f" }}>Sala não encontrada.</div>
+      <div className="custom-create-page px-4 py-20">
+        <p className="mx-auto max-w-md rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-center text-sm font-medium text-danger">
+          Sala não encontrada.
+        </p>
+      </div>
     );
-  } else if (!room.type || room.type !== "permanente") {
-    renderContent = <div>Este fluxo é apenas para salas fixas.</div>;
+  } else if (!isRoomPlayable(room)) {
+    renderContent = (
+      <div className="custom-create-page px-4 py-20 text-center">
+        <p className="mx-auto max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-ink">
+          Esta sala expirou ou está fechada. Volte ao lobby ou entre em outra
+          sala.
+        </p>
+      </div>
+    );
   } else if (!player) {
     renderContent = (
-      <div style={{ color: "#d32f2f", textAlign: "center", margin: "32px 0" }}>
-        Adicionando você como membro da sala...
+      <div className="custom-create-page">
+        <div className="h-16" aria-hidden />
+        <div className="mx-auto flex min-h-[50vh] max-w-lg flex-col items-center justify-center px-4 text-center">
+          <div className="custom-lobby-spinner" aria-hidden />
+          <p className="mt-4 text-base font-semibold text-ink">
+            Entrando na partida...
+          </p>
+        </div>
       </div>
     );
   }
@@ -163,36 +198,25 @@ const CustomRoomGame: React.FC = () => {
       return;
     }
 
-    const allowedModes = ["casual", "desafio", "custom"] as const;
-    function isAllowedMode(m: unknown): m is (typeof allowedModes)[number] {
-      return (
-        typeof m === "string" && (allowedModes as readonly string[]).includes(m)
-      );
-    }
-    const modo = isAllowedMode(rodada.modo) ? rodada.modo : "casual";
-    const code = rodada.codigo
-      ? rodada.codigo.split("")
-      : generateDailyCode(
-          `${todayKey()}-${room.id}-rodada${rodada.rodada}-modo${modo}`
-        );
-    let maxTries = 10;
-    if (modo === "casual") maxTries = 6;
-    else if (modo === "desafio") maxTries = 15;
+    const modo = isCustomRoomMode(rodada.modo ?? "") ? rodada.modo! : "casual";
+    const codeSessionKey = getCustomRoomCodeSessionKey(room, player, rodada.rodada);
+    const code = getCustomRoomDailyCode(
+      room.id,
+      rodada.rodada,
+      modo,
+      codeSessionKey
+    );
+    const maxTries = getModeMaxTries(modo as CustomRoomMode);
     setRodadaInfo({ rodadaIdx, rodada, modo, code, maxTries });
 
-    // --- RESTAURA PROGRESSO DO FIRESTORE DE FORMA ROBUSTA ---
-    const dataHoje = todayKey();
-    // Sempre prioriza progresso finalizado, se houver mais de um para a rodada/data
-    const progressoList =
-      player?.progresso?.filter(
-        (p) => p.rodada === rodada.rodada && p.data === dataHoje
-      ) || [];
-    const progresso = progressoList.find((p) => p.terminou) || progressoList[0];
+    const progresso = findRoundProgress(player, rodada.rodada, room);
     if (progresso) {
       const palpitesFirestore = Array.isArray(progresso.palpites)
         ? progresso.palpites
         : [];
-      const palpitesLocal = guesses.map((g) => g.join(""));
+      const palpitesLocal = guesses.map((g) =>
+        serializeGuess(g, modo)
+      );
       const isSameGuesses =
         palpitesFirestore.length === palpitesLocal.length &&
         palpitesFirestore.every((p, i) => p === palpitesLocal[i]);
@@ -238,7 +262,7 @@ const CustomRoomGame: React.FC = () => {
         (!isSameGuesses || !isSameWin || !isSameFinished) &&
         (!localChangedRef.current || isRemoteChanged)
       ) {
-        setGuesses(palpitesFirestore.map((p) => p.split("")));
+        setGuesses(palpitesFirestore.map((p) => parseGuess(p, modo)));
         setInputDigits(["", "", "", ""]);
         if (progresso.terminou) {
           setHasWon(!!progresso.win);
@@ -291,20 +315,29 @@ const CustomRoomGame: React.FC = () => {
     if (hasFinished) return;
     const lastGuess = guesses[guesses.length - 1];
     if (!lastGuess) return;
-    const isCorrect = lastGuess.join("") === rodadaInfo.code.join("");
+    const isCorrect =
+      rodadaInfo.modo === "codigo-mestre"
+        ? lastGuess.every(
+            (digit, index) =>
+              String(Number(digit)) === String(Number(rodadaInfo.code[index]))
+          )
+        : lastGuess.join("") === rodadaInfo.code.join("");
+    const reachedMaxTries = guesses.length >= (rodadaInfo.maxTries || Infinity);
 
-    // Salva progresso parcial no Firestore
-    savePartialProgress(guesses);
-
-    // [CustomRoomGame] Novo palpite
     if (isCorrect) {
       setHasWon(true);
       setHasFinished({ win: true, tries: guesses.length });
       handleWinCustomRoom(guesses.length, true, guesses);
-    } else if (guesses.length >= (rodadaInfo.maxTries || Infinity)) {
+      return;
+    }
+
+    if (reachedMaxTries) {
       setHasFinished({ win: false, tries: guesses.length });
       handleWinCustomRoom(guesses.length, false, guesses);
+      return;
     }
+
+    savePartialProgress(guesses);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guesses, rodadaInfo, hasFinished]);
 
@@ -312,8 +345,10 @@ const CustomRoomGame: React.FC = () => {
   async function savePartialProgress(guessesArr: string[][]) {
     if (!room || !rodadaInfo || !rodadaInfo.rodada) return;
     try {
-      const dataHoje = todayKey();
-      const palpitesSerializados = guessesArr.map((guess) => guess.join(""));
+      const progressKey = getCustomRoomProgressKey(room);
+      const palpitesSerializados = guessesArr.map((guess) =>
+        serializeGuess(guess, rodadaInfo.modo)
+      );
       const data = await roomsApi.getRoom(room.id);
       if (!data) return;
 
@@ -327,13 +362,14 @@ const CustomRoomGame: React.FC = () => {
         let progressoRemoto = Array.isArray(member.progresso)
           ? [...member.progresso]
           : [];
-        progressoRemoto = progressoRemoto.filter(
-          (entry) =>
-            !(entry.rodada === rodadaInfo.rodada.rodada && entry.data === dataHoje)
+        progressoRemoto = removeRoundProgressEntries(
+          progressoRemoto,
+          rodadaInfo.rodada.rodada,
+          room
         );
         progressoRemoto.push({
           rodada: rodadaInfo.rodada.rodada,
-          data: dataHoje,
+          data: progressKey,
           tentativas: guessesArr.length,
           terminou: false,
           win: false,
@@ -354,7 +390,7 @@ const CustomRoomGame: React.FC = () => {
             progresso: [
               {
                 rodada: rodadaInfo.rodada.rodada,
-                data: dataHoje,
+                data: progressKey,
                 tentativas: guessesArr.length,
                 terminou: false,
                 win: false,
@@ -379,8 +415,10 @@ const CustomRoomGame: React.FC = () => {
     if (!room || !rodadaInfo || !rodadaInfo.rodada) return;
 
     try {
-      const dataHoje = todayKey();
-      const palpitesSerializados = palpites.map((guess) => guess.join(""));
+      const progressKey = getCustomRoomProgressKey(room);
+      const palpitesSerializados = palpites.map((guess) =>
+        serializeGuess(guess, rodadaInfo.modo)
+      );
 
       const data = await roomsApi.getRoom(room.id);
       if (!data) throw new Error("Sala não encontrada");
@@ -396,13 +434,14 @@ const CustomRoomGame: React.FC = () => {
         let progressoRemoto = Array.isArray(member.progresso)
           ? [...member.progresso]
           : [];
-        progressoRemoto = progressoRemoto.filter(
-          (entry) =>
-            !(entry.rodada === rodadaInfo.rodada.rodada && entry.data === dataHoje)
+        progressoRemoto = removeRoundProgressEntries(
+          progressoRemoto,
+          rodadaInfo.rodada.rodada,
+          room
         );
         progressoRemoto.push({
           rodada: rodadaInfo.rodada.rodada,
-          data: dataHoje,
+          data: progressKey,
           tentativas,
           terminou: true,
           win,
@@ -423,7 +462,7 @@ const CustomRoomGame: React.FC = () => {
             progresso: [
               {
                 rodada: rodadaInfo.rodada.rodada,
-                data: dataHoje,
+                data: progressKey,
                 tentativas,
                 terminou: true,
                 win,
@@ -434,25 +473,8 @@ const CustomRoomGame: React.FC = () => {
         ];
       }
 
-      const rodadasAtualizadas = Array.isArray(data.rodadas)
-        ? [...data.rodadas]
-        : [];
-      const rodadaIdxToUpdate = rodadasAtualizadas.findIndex(
-        (round) => round.rodada === rodadaInfo.rodada.rodada
-      );
-      if (rodadaIdxToUpdate !== -1) {
-        const codigoCorreto = rodadaInfo.code.join("");
-        if (rodadasAtualizadas[rodadaIdxToUpdate].codigo !== codigoCorreto) {
-          rodadasAtualizadas[rodadaIdxToUpdate] = {
-            ...rodadasAtualizadas[rodadaIdxToUpdate],
-            codigo: codigoCorreto,
-          };
-        }
-      }
-
       await roomsApi.patchRoom(room.id, {
         membros: membrosFinal,
-        rodadas: rodadasAtualizadas,
       });
 
       const roomData = await roomsApi.getRoom(room.id);
@@ -465,70 +487,33 @@ const CustomRoomGame: React.FC = () => {
       )
         ? roomData.rodadas
         : [];
-      const pontosPorModo: Record<string, number> = { casual: 6, desafio: 15 };
-      const today = todayKey();
 
-      const ranking = membrosAtual.map((m) => {
-        let pontos = 0;
-
-        rodadasConfig.forEach((rodada) => {
-          const modo = rodada.modo || "casual";
-          const maxPontos = pontosPorModo[modo] || 15;
-
-          const progressoRodada = Array.isArray(m.progresso)
-            ? m.progresso.filter((p) => p.rodada === rodada.rodada)
-            : [];
-
-          let datasRodada: string[] = [];
-          membrosAtual.forEach((m2) => {
-            if (Array.isArray(m2.progresso)) {
-              m2.progresso.forEach((p) => {
-                if (
-                  p.rodada === rodada.rodada &&
-                  !datasRodada.includes(p.data)
-                ) {
-                  datasRodada.push(p.data);
-                }
-              });
-            }
-          });
-
-          datasRodada = datasRodada.filter((d) => d <= today).sort();
-
-          datasRodada.forEach((data) => {
-            if (data === today) {
-              const progHoje = progressoRodada.find(
-                (p) => p.data === today && p.terminou
-              );
-              if (progHoje) {
-                pontos += progHoje.tentativas;
-              }
-            } else {
-              const progDia = progressoRodada.find(
-                (p) => p.data === data && p.terminou
-              );
-              if (progDia) {
-                pontos += progDia.tentativas;
-              } else {
-                pontos += maxPontos;
-              }
-            }
-          });
-        });
-        return {
-          playerId: m.id,
-          nome: m.nome,
-          pontos,
-        };
-      });
-
-      ranking.sort((a, b) => a.pontos - b.pontos);
+      const ranking = computeRoomRanking(membrosAtual, rodadasConfig, roomData);
       await roomsApi.patchRoom(room.id, { ranking });
     } catch (e: unknown) {
       const err = e as Error;
       alert("Erro ao salvar progresso: " + (err.message || err));
     }
   }
+
+  const completedToday = useMemo(() => {
+    if (!player || !room?.rodadas?.length) return 0;
+
+    return room.rodadas.filter((rodada) => {
+      const progresso = findRoundProgress(player, rodada.rodada, room);
+      return progresso?.terminou;
+    }).length;
+  }, [player, room]);
+
+  const totalRodadas = room?.rodadas?.length ?? 0;
+  const ranking = useMemo(() => {
+    if (!room) return [];
+    return computeRoomRanking(room.membros, room.rodadas ?? [], room);
+  }, [room]);
+  const roomAgeDays =
+    room?.type === "permanente" && room.criadaEm
+      ? getRoomAgeDays(room.criadaEm)
+      : null;
 
   if (renderContent) {
     return <>{renderContent}</>;
@@ -564,32 +549,98 @@ const CustomRoomGame: React.FC = () => {
       {painelRodada ? (
         painelRodada
       ) : (
-        <MainContainer>
-          <Card style={{ padding: 0 }}>
-            <BackButton to={roomId ? `/custom/lobby/${roomId}` : "/desafios"} />
-            <RoomHeader>{room?.nome}</RoomHeader>
-            <GameMainWrapper>
-              <GameLeftCol>
-                <CustomRoomRounds
-                  rodadas={room!.rodadas}
-                  player={player}
-                  setRodadaAberta={setRodadaAberta}
-                />
-              </GameLeftCol>
-              <GameRightCol>
-                <RankingCard style={{ marginTop: 0 }}>
-                  <RankingTitle>Ranking</RankingTitle>
-                  <CustomRoomRanking
-                    ranking={room!.ranking}
-                    membros={room!.membros}
-                    userId={userId}
-                    totalRodadas={room!.rodadas.length}
+        <div className="custom-create-page">
+          <div className="h-16" aria-hidden />
+
+          <main className="relative overflow-hidden pb-12">
+            <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+              <div className="absolute -right-24 top-0 size-[420px] rounded-full bg-brand/6 blur-3xl" />
+              <div className="absolute -bottom-24 -left-24 size-[360px] rounded-full bg-success/6 blur-3xl" />
+            </div>
+
+            <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+              <BackButton
+                to={roomId ? `/custom/lobby/${roomId}` : "/custom/entrar"}
+                className="mb-4"
+              />
+
+              <div className="custom-game-hero">
+                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white/90">
+                  Partida
+                </span>
+                <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                  {room?.nome}
+                </h1>
+                <p className="mt-2 text-sm text-white/85">
+                  Escolha uma rodada para jogar. Seu progresso fica salvo
+                  automaticamente nesta partida.
+                </p>
+
+                <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+                  <div className="custom-lobby-stat-pill">
+                    <span className="custom-lobby-stat-value">
+                      {completedToday}/{totalRodadas}
+                    </span>
+                    <span className="custom-lobby-stat-label">Concluídas</span>
+                  </div>
+                  <div className="custom-lobby-stat-pill">
+                    <span className="custom-lobby-stat-value">{totalRodadas}</span>
+                    <span className="custom-lobby-stat-label">Rodadas</span>
+                  </div>
+                  <div className="custom-lobby-stat-pill">
+                    <span className="custom-lobby-stat-value">
+                      {room?.membros.length ?? 0}
+                    </span>
+                    <span className="custom-lobby-stat-label">Jogadores</span>
+                  </div>
+                  {roomAgeDays !== null && (
+                    <div className="custom-lobby-stat-pill">
+                      <span className="custom-lobby-stat-value">{roomAgeDays}</span>
+                      <span className="custom-lobby-stat-label">Dias ativa</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
+                <section className="custom-create-section">
+                  <h2 className="custom-create-section-title">Rodadas</h2>
+                  <p className="custom-create-section-subtitle">
+                    Cada rodada usa o modo configurado na criação da sala.
+                  </p>
+                  <CustomRoomRounds
+                    rodadas={room!.rodadas}
+                    player={player}
+                    room={room!}
+                    setRodadaAberta={setRodadaAberta}
                   />
-                </RankingCard>
-              </GameRightCol>
-            </GameMainWrapper>
-          </Card>
-        </MainContainer>
+                </section>
+
+                <aside className="lg:sticky lg:top-24 lg:self-start">
+                  <div className="custom-create-summary">
+                    <h2 className="text-lg font-bold text-ink">Ranking</h2>
+                    <p className="mt-1 text-sm text-ink-muted">
+                      Mais pontos = melhor colocação.
+                    </p>
+                    <div className="mt-4">
+                      <CustomRoomRanking
+                        ranking={ranking}
+                        membros={room!.membros}
+                        userId={userId}
+                        totalRodadas={totalRodadas}
+                        roomType={room!.type}
+                        roomCreatedAt={room!.criadaEm}
+                        partidaNumero={room!.partidaNumero}
+                        rankingPeriodo={room!.rankingPeriodo}
+                        rankingResetEm={room!.rankingResetEm}
+                      />
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </main>
+        </div>
       )}
     </>
   );

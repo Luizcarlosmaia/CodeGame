@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { roomsApi } from "../api/roomsApi";
 
 export interface RoomMessage {
@@ -9,71 +9,100 @@ export interface RoomMessage {
   createdAt: Date;
 }
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 3000;
+
+function mapMessages(
+  data: Awaited<ReturnType<typeof roomsApi.getChatMessages>>
+): RoomMessage[] {
+  return data.map((message) => ({
+    id: message.id,
+    userId: message.userId,
+    userName: message.userName,
+    text: message.text,
+    createdAt: new Date(message.createdAt),
+  }));
+}
 
 export function useRoomChat(roomId: string | undefined) {
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const roomIdRef = useRef(roomId);
+
+  roomIdRef.current = roomId;
+
+  const fetchMessages = useCallback(async (silent = false) => {
+    const currentRoomId = roomIdRef.current;
+    if (!currentRoomId) return;
+
+    if (!silent) setLoading(true);
+
+    try {
+      const data = await roomsApi.getChatMessages(currentRoomId);
+      setMessages(mapMessages(data));
+      setError(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Erro ao buscar mensagens"
+      );
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!roomId) return;
 
-    let cancelled = false;
-    setLoading(true);
-
-    const fetchMessages = async () => {
-      try {
-        const data = await roomsApi.getChatMessages(roomId);
-        if (!cancelled) {
-          setMessages(
-            data.map((message) => ({
-              id: message.id,
-              userId: message.userId,
-              userName: message.userName,
-              text: message.text,
-              createdAt: new Date(message.createdAt),
-            }))
-          );
-          setError(null);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Erro ao buscar mensagens");
-          setLoading(false);
-        }
-      }
-    };
-
     fetchMessages();
-    const interval = setInterval(fetchMessages, POLL_INTERVAL_MS);
+    const interval = setInterval(() => {
+      fetchMessages(true);
+    }, POLL_INTERVAL_MS);
 
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [roomId]);
+    return () => clearInterval(interval);
+  }, [roomId, fetchMessages]);
 
   const sendMessage = useCallback(
     async (userId: string, userName: string, text: string) => {
-      if (!roomId) return;
+      const currentRoomId = roomIdRef.current;
+      if (!currentRoomId) return;
 
-      setLoading(true);
+      const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const optimisticMessage: RoomMessage = {
+        id: optimisticId,
+        userId,
+        userName,
+        text,
+        createdAt: new Date(),
+      };
+
+      setSending(true);
+      setMessages((prev) => [...prev, optimisticMessage]);
+      setError(null);
+
       try {
-        await roomsApi.sendChatMessage(roomId, { userId, userName, text });
-        setLoading(false);
+        await roomsApi.sendChatMessage(currentRoomId, {
+          userId,
+          userName,
+          text,
+        });
+        const data = await roomsApi.getChatMessages(currentRoomId);
+        setMessages(mapMessages(data));
       } catch (err) {
+        setMessages((prev) =>
+          prev.filter((message) => message.id !== optimisticId)
+        );
         setError(
           err instanceof Error
             ? err.message
             : "Erro desconhecido ao enviar mensagem."
         );
-        setLoading(false);
+      } finally {
+        setSending(false);
       }
     },
-    [roomId]
+    []
   );
 
-  return { messages, loading, error, sendMessage };
+  return { messages, loading, sending, error, sendMessage };
 }

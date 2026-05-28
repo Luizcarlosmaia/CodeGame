@@ -1,3 +1,944 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Mono", "IBM Plex Mono", "Source Code Pro",
+    "Roboto Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+
+  --color-background: #f7f9fa;
+  --color-surface: #ffffff;
+  --color-primary: #1e1e2e;
+  --color-brand: #1976d2;
+  --color-brand-hover: #1565c0;
+  --color-accent: #153972;
+  --color-success: #16a085;
+  --color-success-hover: #138d75;
+  --color-danger: #ad0000;
+  --color-muted: #6c757d;
+  --color-border: #ced4da;
+  --color-ink: #181c24;
+  --color-ink-soft: #23272f;
+  --color-ink-muted: #444a55;
+
+  --breakpoint-sm: 500px;
+  --breakpoint-md: 700px;
+  --breakpoint-lg: 900px;
+  --breakpoint-xl: 1200px;
+
+  --animate-shake: shake 0.25s ease-in-out;
+  --animate-spin-slow: spin 0.8s linear infinite;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes guess-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) rotate(-12deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08) rotate(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes guess-win {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.2) rotate(-5deg);
+  }
+  60% {
+    transform: scale(0.95) rotate(3deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes guess-lose {
+  0% {
+    background: #f8d7da;
+  }
+  50% {
+    background: #ffb3b3;
+  }
+  100% {
+    background: #f8d7da;
+  }
+}
+
+@keyframes table-row-in {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--color-background);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    width: 100%;
+  }
+}
+
+@layer components {
+  .page-wrapper {
+    @apply mt-14 flex min-h-screen w-full flex-col items-center justify-start bg-background p-1 md:p-0.5;
+  }
+
+  .page-content {
+    @apply flex w-full max-w-[460px] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-surface px-4 pb-8 pt-2 shadow-md min-h-[calc(75vh-2rem)] sm:px-8 lg:mt-8 lg:max-w-[900px] lg:rounded-[28px] lg:px-20 lg:pb-8 lg:shadow-lg;
+  }
+
+  .game-shell {
+    @apply box-border flex w-full items-center justify-center overflow-hidden bg-background px-3 pb-4;
+    min-height: calc(100dvh - 4rem);
+    padding-top: calc(4rem + 1.25rem);
+  }
+
+  .game-shell-fill {
+    @apply h-[calc(100dvh-4rem)] min-h-[calc(100dvh-4rem)] items-stretch px-2 pb-2;
+    padding-top: calc(4rem + 0.5rem);
+  }
+
+  .game-panel {
+    @apply flex w-full max-w-[420px] flex-col overflow-hidden rounded-2xl bg-surface px-2.5 py-2 shadow-[0_8px_32px_rgba(15,23,42,0.08)] sm:max-w-[440px] sm:px-3 sm:py-2.5;
+    height: min(calc(100dvh - 6.5rem), 720px);
+    max-height: calc(100dvh - 6.5rem);
+  }
+
+  .game-panel-fill {
+    @apply mx-auto h-full max-h-full min-h-0 py-2 sm:py-2.5;
+    height: 100%;
+    max-height: 100%;
+  }
+
+  .game-panel-desafio {
+    @apply max-w-[min(100%,440px)] sm:max-w-[460px] lg:max-w-[500px];
+  }
+
+  .game-panel-codigo-mestre {
+    @apply max-w-[min(100%,460px)] sm:max-w-[480px] lg:max-w-[520px];
+  }
+
+  .game-codigo-mestre-input-wrap {
+    @apply shrink-0;
+  }
+
+  .game-codigo-mestre-fields {
+    @apply flex justify-center gap-2 sm:gap-2.5;
+  }
+
+  .game-codigo-mestre-input {
+    @apply size-12 appearance-none rounded-xl border-2 border-border/80 bg-surface p-0 text-center font-mono text-xl font-bold text-ink shadow-sm transition-all outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:bg-background disabled:text-ink-muted sm:size-14 sm:text-2xl;
+  }
+
+  .game-codigo-mestre-arrow {
+    @apply inline-flex size-12 items-center justify-center text-lg font-bold transition-colors select-none sm:size-14 sm:text-xl;
+  }
+
+  .game-codigo-mestre-arrow-sm {
+    @apply size-8 text-base sm:size-9 sm:text-lg;
+  }
+
+  .game-codigo-mestre-arrow-correct {
+    @apply text-success;
+  }
+
+  .game-codigo-mestre-arrow-active {
+    @apply text-[#d97706];
+  }
+
+  .game-codigo-mestre-arrow-muted {
+    @apply text-border;
+  }
+
+  .game-codigo-mestre-main {
+    @apply flex min-h-0 flex-1 flex-col items-stretch justify-start gap-3 py-1;
+  }
+
+  .game-codigo-mestre-panel {
+    @apply flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-2xl border border-border/60 bg-background/70 px-4 py-5 sm:px-5 sm:py-6;
+  }
+
+  .game-codigo-mestre-progress {
+    @apply flex flex-wrap justify-center gap-1.5;
+  }
+
+  .game-codigo-mestre-progress-dot {
+    @apply size-2 rounded-full bg-border/80 transition-colors;
+  }
+
+  .game-codigo-mestre-progress-dot-used {
+    @apply bg-[#d97706];
+  }
+
+  .game-codigo-mestre-progress-dot-win {
+    @apply bg-success;
+  }
+
+  .game-codigo-mestre-progress-dot-lose {
+    @apply bg-danger;
+  }
+
+  .game-codigo-mestre-panel-empty {
+    @apply flex max-w-[280px] flex-col items-center gap-2 text-center;
+  }
+
+  .game-codigo-mestre-panel-title {
+    @apply text-base font-bold text-ink sm:text-lg;
+  }
+
+  .game-codigo-mestre-panel-subtitle {
+    @apply text-sm leading-relaxed text-ink-muted;
+  }
+
+  .game-codigo-mestre-panel-hint {
+    @apply mt-2 flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-[11px] font-medium text-ink-soft shadow-sm;
+  }
+
+  .game-codigo-mestre-panel-hint-icon {
+    @apply inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#f59e0b]/10 font-bold text-[#d97706];
+  }
+
+  .game-codigo-mestre-panel-result {
+    @apply flex w-full max-w-[320px] flex-col gap-3;
+  }
+
+  .game-codigo-mestre-panel-result-head {
+    @apply flex items-center justify-between gap-2;
+  }
+
+  .game-codigo-mestre-panel-result-label {
+    @apply text-sm font-bold text-ink;
+  }
+
+  .game-codigo-mestre-panel-result-meta {
+    @apply text-xs font-semibold text-ink-muted;
+  }
+
+  .game-codigo-mestre-feedback-grid {
+    @apply grid grid-cols-4 gap-2;
+  }
+
+  .game-codigo-mestre-feedback-cell {
+    @apply flex flex-col items-center gap-1 rounded-xl border border-border/50 bg-surface px-1 py-2 shadow-sm;
+  }
+
+  .game-codigo-mestre-feedback-value {
+    @apply font-mono text-lg font-bold tabular-nums text-ink sm:text-xl;
+  }
+
+  .game-codigo-mestre-legend {
+    @apply flex shrink-0 items-center justify-center gap-4;
+  }
+
+  .game-codigo-mestre-legend-item {
+    @apply inline-flex items-center gap-0.5;
+  }
+
+  .game-codigo-mestre-answer {
+    @apply mt-1 flex w-full flex-col items-center gap-2 rounded-xl border border-danger/20 bg-danger/5 px-3 py-3;
+  }
+
+  .game-codigo-mestre-answer-label {
+    @apply text-xs font-semibold uppercase tracking-wide text-danger;
+  }
+
+  .game-codigo-mestre-answer-grid {
+    @apply grid grid-cols-4 gap-2;
+  }
+
+  .game-codigo-mestre-answer-digit {
+    @apply flex min-w-[3rem] items-center justify-center rounded-lg border border-danger/15 bg-surface px-2 py-2 font-mono text-lg font-bold tabular-nums text-ink sm:text-xl;
+  }
+
+  .game-header {
+    @apply shrink-0;
+  }
+
+  .game-main {
+    @apply flex min-h-0 flex-1 flex-col gap-2 overflow-hidden;
+  }
+
+  .game-controls {
+    @apply mt-auto shrink-0 pt-1;
+  }
+
+  .game-result-banner {
+    @apply mx-auto my-3 flex w-full max-w-full shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold shadow-sm sm:my-3.5 sm:px-4 sm:py-3 sm:text-sm;
+  }
+
+  .game-result-banner-win {
+    @apply border border-success/20 bg-success/10 text-success;
+  }
+
+  .game-result-banner-lose {
+    @apply border border-danger/20 bg-danger/5 text-danger;
+  }
+
+  .game-legend {
+    @apply flex shrink-0 flex-wrap justify-center gap-x-3 gap-y-0.5 text-[10px] font-medium text-ink-muted;
+  }
+
+  .game-casual-board {
+    @apply flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden rounded-xl border border-border/60 bg-background/70 p-2.5 sm:gap-2;
+  }
+
+  .game-casual-row {
+    @apply flex shrink-0 items-center gap-2.5;
+  }
+
+  .game-casual-row-number {
+    @apply w-5 shrink-0 text-center text-xs font-bold tabular-nums;
+  }
+
+  .game-casual-row-guesses {
+    @apply flex flex-1 items-center justify-center;
+  }
+
+  .game-desafio-board {
+    @apply flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-background/70 p-1.5 sm:p-2;
+  }
+
+  .game-desafio-rows {
+    @apply flex min-h-0 flex-1 flex-col gap-px overflow-hidden sm:gap-0.5;
+  }
+
+  .game-desafio-head,
+  .game-desafio-row {
+    @apply grid items-center gap-1;
+    grid-template-columns: 1.25rem minmax(0, 1fr) 2.875rem 2.875rem;
+  }
+
+  @media (min-width: 640px) {
+    .game-desafio-head,
+    .game-desafio-row {
+      grid-template-columns: 1.5rem minmax(0, 1fr) 3rem 3rem;
+      @apply gap-1.5;
+    }
+  }
+
+  .game-desafio-head {
+    @apply mb-0.5 shrink-0 px-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-muted sm:text-[10px];
+  }
+
+  .game-desafio-row {
+    @apply min-h-[1.375rem] flex-1 rounded-md px-1 py-0 sm:min-h-[1.5rem] sm:rounded-lg sm:py-0.5;
+  }
+
+  .game-desafio-head-stat {
+    @apply text-center whitespace-nowrap;
+  }
+
+  .game-desafio-row-filled {
+    @apply bg-surface shadow-sm;
+  }
+
+  .game-desafio-row-empty {
+    @apply border border-dashed border-border/50 bg-background/40 text-ink-muted;
+  }
+
+  .game-desafio-row-number {
+    @apply text-center text-[10px] font-bold tabular-nums text-ink-muted sm:text-xs;
+  }
+
+  .game-desafio-guess {
+    @apply text-xs font-semibold text-ink sm:text-sm;
+  }
+
+  .game-desafio-badge {
+    @apply mx-auto inline-flex size-5 items-center justify-center rounded-md text-[9px] font-bold sm:size-6 sm:text-[10px];
+  }
+
+  .game-controls-desafio {
+    @apply shrink-0 pt-0.5;
+  }
+
+  .game-keypad-desafio {
+    @apply grid w-full max-w-[260px] grid-cols-3 gap-1 sm:max-w-[248px];
+  }
+
+  .game-key-desafio {
+    @apply flex h-9 cursor-pointer items-center justify-center rounded-lg border border-border/50 bg-surface font-mono text-base font-semibold text-ink shadow-sm transition-all hover:border-brand/30 hover:bg-brand/5 active:scale-[0.97] active:bg-brand active:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:text-base;
+  }
+
+  .game-submit-desafio {
+    @apply mt-1 flex h-9 w-full max-w-[260px] items-center justify-center rounded-xl border-0 bg-success text-sm font-bold text-white shadow-[0_4px_14px_rgba(22,160,133,0.3)] transition-all hover:bg-success-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-border disabled:text-ink-muted disabled:shadow-none sm:max-w-[248px];
+  }
+
+  .game-desafio-badge-correct {
+    @apply bg-[#22c55e] text-white;
+  }
+
+  .game-desafio-badge-present {
+    @apply bg-[#fbbf24] text-ink;
+  }
+
+  .game-desafio-badge-empty {
+    @apply bg-border/40 text-ink-muted;
+  }
+
+  .game-progress-bar {
+    @apply w-full;
+  }
+
+  .custom-page-wrapper {
+    @apply flex min-h-screen w-full flex-col bg-background;
+  }
+
+  .custom-create-page {
+    @apply min-h-screen w-full bg-background;
+  }
+
+  .custom-create-section {
+    @apply rounded-2xl border border-border/60 bg-surface p-5 shadow-sm sm:p-6;
+  }
+
+  .custom-create-section-title {
+    @apply text-lg font-bold text-ink;
+  }
+
+  .custom-create-section-subtitle {
+    @apply mt-1 mb-4 text-sm text-ink-muted;
+  }
+
+  .custom-create-mode-card {
+    @apply flex h-full flex-col rounded-2xl border border-border/60 p-4 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-brand/40;
+  }
+
+  .custom-create-mode-card-selected {
+    @apply border-brand/40 bg-brand/5;
+  }
+
+  .custom-create-stepper {
+    @apply inline-flex items-center overflow-hidden rounded-lg border border-border bg-surface;
+  }
+
+  .custom-create-stepper-btn {
+    @apply flex size-9 items-center justify-center border-0 bg-transparent text-lg font-semibold text-brand transition-colors hover:bg-brand/5 disabled:cursor-not-allowed disabled:text-ink-muted;
+  }
+
+  .custom-create-stepper-value {
+    @apply min-w-[2rem] px-1 text-center text-sm font-bold tabular-nums text-ink;
+  }
+
+  .custom-create-summary {
+    @apply rounded-2xl border border-border/60 bg-surface p-5 shadow-sm sm:p-6;
+  }
+
+  .custom-join-room-card {
+    @apply rounded-2xl border border-border/60 bg-background p-4 shadow-sm transition-all hover:border-brand/30 hover:bg-brand/5 hover:shadow-md;
+  }
+
+  .custom-join-room-skeleton {
+    @apply bg-border/40;
+  }
+
+  .custom-join-mode-chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-border/60 bg-surface px-2 py-0.5 text-[11px] font-semibold text-ink-muted;
+  }
+
+  .custom-lobby-page {
+    @apply min-h-screen w-full bg-background;
+  }
+
+  .custom-lobby-spinner {
+    @apply size-10 animate-spin rounded-full border-4 border-brand/20 border-t-brand;
+  }
+
+  .custom-lobby-hero {
+    @apply rounded-2xl bg-gradient-to-br from-brand to-brand-hover p-5 shadow-md sm:p-6;
+  }
+
+  .custom-lobby-code-box {
+    @apply w-full rounded-xl bg-white/95 p-4 shadow-sm sm:max-w-sm;
+  }
+
+  .custom-lobby-copy-btn {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-surface px-3 py-1.5 text-sm font-semibold text-brand transition-colors hover:bg-brand/5;
+  }
+
+  .custom-lobby-stat-pill {
+    @apply flex flex-col items-center rounded-xl bg-white/12 px-2 py-2.5 text-center backdrop-blur-sm sm:px-3;
+  }
+
+  .custom-lobby-stat-value {
+    @apply text-xl font-extrabold tabular-nums text-white sm:text-2xl;
+  }
+
+  .custom-lobby-stat-label {
+    @apply mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/75 sm:text-[11px];
+  }
+
+  .custom-lobby-member-row {
+    @apply flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2.5;
+  }
+
+  .custom-lobby-member-row-you {
+    @apply border-brand/30 bg-brand/5;
+  }
+
+  .custom-lobby-avatar {
+    @apply flex size-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-sm font-bold text-brand;
+  }
+
+  .custom-lobby-owner-badge {
+    @apply shrink-0 rounded-full bg-[#ffd600]/20 px-2 py-0.5 text-[11px] font-bold text-[#9a7b00];
+  }
+
+  .custom-lobby-danger-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-danger/25 bg-surface px-5 py-2.5 text-sm font-bold text-danger transition-colors hover:bg-danger/5 disabled:cursor-not-allowed;
+  }
+
+  .custom-lobby-chat {
+    @apply flex flex-col rounded-2xl border border-border/60 bg-surface p-3 shadow-sm sm:p-4;
+  }
+
+  .custom-lobby-chat-header {
+    @apply border-b border-border/60 pb-2;
+  }
+
+  .custom-lobby-chat-messages {
+    @apply mb-2 mt-2 max-h-[200px] min-h-[96px] space-y-0.5 overflow-y-auto rounded-lg bg-background px-1.5 py-1.5 sm:max-h-[240px];
+  }
+
+  .custom-lobby-chat-line {
+    @apply flex flex-wrap items-baseline gap-x-1.5 gap-y-0 rounded-md px-1.5 py-0.5 text-[13px] leading-snug text-ink;
+  }
+
+  .custom-lobby-chat-line-mine {
+    @apply bg-brand/5;
+  }
+
+  .custom-lobby-chat-author {
+    @apply shrink-0 font-semibold text-brand;
+  }
+
+  .custom-lobby-chat-time {
+    @apply shrink-0 text-[10px] tabular-nums text-ink-muted;
+  }
+
+  .custom-lobby-chat-time::after {
+    content: "·";
+    @apply ml-1.5 text-ink-muted/60;
+  }
+
+  .custom-lobby-chat-text {
+    @apply min-w-0 flex-1 break-words text-ink-soft;
+  }
+
+  .custom-lobby-chat-form {
+    @apply flex gap-1.5;
+  }
+
+  .custom-lobby-chat-input {
+    @apply min-h-0 flex-1 py-2 text-sm;
+  }
+
+  .custom-lobby-chat-send {
+    @apply flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:bg-border;
+  }
+
+  .custom-lobby-chat-error {
+    @apply mt-1.5 text-[11px] font-medium text-danger;
+  }
+
+  .custom-lobby-transfer-btn {
+    @apply inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand/20 bg-brand/5 px-2.5 py-1.5 text-[11px] font-semibold text-brand transition-colors hover:bg-brand/10;
+  }
+
+  .custom-game-hero {
+    @apply rounded-2xl bg-gradient-to-br from-brand to-brand-hover p-5 shadow-md sm:p-6;
+  }
+
+  .custom-game-rounds-list {
+    @apply m-0 grid list-none gap-3 p-0 sm:grid-cols-2;
+  }
+
+  .custom-game-round-card {
+    @apply rounded-2xl border border-border/60 bg-background p-4 shadow-sm;
+  }
+
+  .custom-game-round-status {
+    @apply shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide;
+  }
+
+  .custom-game-round-status-new {
+    @apply bg-background text-ink-muted ring-1 ring-border/60;
+  }
+
+  .custom-game-round-status-active {
+    @apply bg-brand/10 text-brand;
+  }
+
+  .custom-game-round-status-win {
+    @apply bg-success/10 text-success;
+  }
+
+  .custom-game-round-status-done {
+    @apply bg-ink-muted/10 text-ink-muted;
+  }
+
+  .custom-game-round-play {
+    @apply inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-hover;
+  }
+
+  .custom-game-round-review {
+    @apply inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-surface px-3 py-1.5 text-xs font-semibold text-ink-muted transition-colors hover:border-brand/30 hover:text-brand;
+  }
+
+  .custom-game-guess-chip {
+    @apply rounded-md bg-surface px-2 py-0.5 font-mono text-[10px] font-semibold text-brand ring-1 ring-border/40;
+  }
+
+  .custom-game-guess-chip-win {
+    @apply bg-success/15 text-success ring-success/35;
+  }
+
+  .custom-game-guess-chip-loss {
+    @apply bg-danger/15 text-danger ring-danger/35;
+  }
+
+  .custom-game-round-guesses-label {
+    @apply mt-2 text-[10px] font-semibold uppercase tracking-wide text-ink-muted;
+  }
+
+  .custom-game-round-overlay {
+    @apply flex min-h-screen items-center justify-center bg-background px-3 py-6 sm:px-4 sm:py-8;
+  }
+
+  .custom-game-round-shell {
+    @apply w-full max-w-lg;
+  }
+
+  .custom-game-round-result {
+    @apply absolute inset-0 z-10 flex flex-col items-center justify-center rounded-2xl bg-white/96 p-6 text-center backdrop-blur-md;
+  }
+
+  .custom-game-round-result-card {
+    @apply mx-auto flex w-full flex-col items-center rounded-2xl border border-border/60 bg-surface p-6 text-center shadow-lg sm:p-8;
+  }
+
+  .custom-game-round-result-badge {
+    @apply mb-4 flex size-16 items-center justify-center rounded-full;
+  }
+
+  .custom-game-round-result-badge-win {
+    @apply bg-success/15 text-success;
+  }
+
+  .custom-game-round-result-badge-loss {
+    @apply bg-danger/10 text-danger;
+  }
+
+  .custom-game-round-result-title {
+    @apply mb-1 text-2xl font-extrabold tracking-tight;
+  }
+
+  .custom-game-round-result-score {
+    @apply mb-4 font-mono text-lg font-bold tabular-nums text-brand;
+  }
+
+  .custom-game-round-result-guesses {
+    @apply mb-4 flex max-w-full flex-wrap justify-center gap-1.5;
+  }
+
+  .custom-lobby-ranking-row {
+    @apply flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background px-3 py-2.5;
+  }
+
+  .custom-lobby-ranking-row-you {
+    @apply border-success/25 bg-success/5;
+  }
+
+  .custom-lobby-ranking-row-leader {
+    @apply border-brand/20 bg-brand/5;
+  }
+
+  .btn-primary {
+    @apply flex w-full items-center justify-center rounded-lg bg-brand px-4 py-3.5 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:bg-[#b2dfdb] disabled:text-[#e0e0e0];
+  }
+
+  .btn-success {
+    @apply rounded-xl bg-success px-9 py-3.5 text-xl font-bold text-white shadow-sm transition-colors hover:bg-success-hover;
+  }
+
+  .input-label {
+    @apply mb-1 block text-sm font-semibold text-ink-soft md:text-base;
+  }
+
+  .input-field {
+    @apply w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-ink outline-none transition-shadow focus:border-brand focus:ring-2 focus:ring-brand/20;
+  }
+
+  .card {
+    @apply rounded-2xl bg-surface p-4 shadow-md md:p-6;
+  }
+
+  .lobby-container {
+    @apply mt-[60px] h-auto min-h-[700px] w-full max-w-[900px] rounded-[14px] bg-surface px-4 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.1)] lg:h-[750px] lg:px-8;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3;
+  }
+
+  .modal-box {
+    @apply relative max-h-[92vh] w-[96%] max-w-[540px] overflow-y-auto rounded-[14px] bg-surface px-4 py-6 text-primary shadow-[0_4px_24px_rgba(0,0,0,0.18)] sm:px-9 sm:py-8;
+  }
+
+  .stats-modal-box {
+    @apply relative max-h-[92dvh] w-[94%] max-w-[420px] overflow-y-auto rounded-[24px] bg-surface px-4 py-5 shadow-[0_16px_48px_rgba(15,23,42,0.18)] sm:px-6 sm:py-6;
+  }
+
+  .confirm-modal-box {
+    @apply relative w-[94%] max-w-[400px] rounded-[24px] bg-surface px-4 py-5 shadow-[0_16px_48px_rgba(15,23,42,0.18)] sm:px-6 sm:py-6;
+  }
+
+  .confirm-modal-actions {
+    @apply mt-6 grid grid-cols-2 gap-2.5 sm:gap-3;
+  }
+
+  .confirm-modal-cancel {
+    @apply rounded-xl border border-border/60 bg-surface px-4 py-3 text-sm font-semibold text-ink transition-colors hover:bg-background disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .confirm-modal-confirm {
+    @apply rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .confirm-modal-confirm-danger {
+    @apply bg-danger hover:bg-danger/90;
+  }
+
+  .custom-game-container {
+    @apply mx-auto mt-12 flex w-full max-w-[1100px] flex-col items-center px-0 sm:max-w-[96vw] lg:mt-[50px];
+  }
+
+  .custom-game-card {
+    @apply flex min-h-[500px] w-full max-w-[1100px] flex-col items-center rounded-[14px] bg-[#f8fafc] p-1.5 shadow-[0_2px_12px_rgba(25,118,210,0.08)] sm:px-2 sm:py-2.5 lg:p-4;
+  }
+
+  .game-digit-input {
+    @apply size-10 rounded-lg border border-border p-0 text-center text-2xl leading-10 font-mono sm:size-11 sm:leading-11 sm:text-[1.75rem];
+  }
+
+  .game-keypad {
+    @apply mx-auto grid w-full max-w-[248px] grid-cols-3 gap-1;
+  }
+
+  .game-key {
+    @apply flex h-9 cursor-pointer items-center justify-center rounded-lg border-0 bg-[#dee2e6] font-mono text-lg text-primary active:bg-primary active:text-white disabled:cursor-not-allowed active:disabled:bg-[#dee2e6] active:disabled:text-muted sm:h-10 sm:text-xl;
+  }
+
+  .game-submit {
+    @apply mt-1 flex h-9 w-full max-w-[248px] items-center justify-center rounded-lg border-0 bg-primary px-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-primary disabled:cursor-not-allowed sm:h-10 sm:text-lg;
+  }
+
+  .guess-digit {
+    @apply flex size-10 items-center justify-center rounded-md font-mono text-xl font-bold sm:size-11 sm:text-2xl;
+  }
+
+  .game-digit-input-casual {
+    @apply size-11 appearance-none rounded-xl border-2 border-border/80 bg-surface p-0 text-center text-2xl leading-11 font-mono text-ink shadow-sm transition-all outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:bg-background disabled:text-ink-muted sm:size-12 sm:leading-12 sm:text-[1.75rem];
+  }
+
+  .game-digit-input-casual-active {
+    @apply border-brand ring-2 ring-brand/15;
+  }
+
+  .guess-digit-casual {
+    @apply flex size-10 items-center justify-center rounded-lg font-mono text-lg font-bold leading-none shadow-sm sm:size-11 sm:text-xl;
+  }
+
+  .guess-slot-empty-casual {
+    @apply size-10 rounded-lg border border-dashed border-border/70 bg-background/80 sm:size-11;
+  }
+
+  .game-keypad-casual {
+    @apply grid w-full max-w-[280px] grid-cols-3 gap-1.5 sm:max-w-[248px] sm:gap-1;
+  }
+
+  .game-key-casual {
+    @apply flex h-11 cursor-pointer items-center justify-center rounded-xl border border-border/50 bg-surface font-mono text-xl font-semibold text-ink shadow-sm transition-all hover:border-brand/30 hover:bg-brand/5 active:scale-[0.97] active:bg-brand active:text-white disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-lg;
+  }
+
+  .game-submit-casual {
+    @apply mt-1.5 flex h-11 w-full max-w-[280px] items-center justify-center rounded-xl border-0 bg-success text-base font-bold text-white shadow-[0_4px_14px_rgba(22,160,133,0.3)] transition-all hover:bg-success-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-border disabled:text-ink-muted disabled:shadow-none sm:h-10 sm:max-w-[248px] sm:text-sm;
+  }
+
+  .game-toolbar-btn {
+    @apply flex size-9 items-center justify-center rounded-lg border border-border/60 bg-surface text-ink-muted shadow-sm transition-colors hover:border-brand/30 hover:bg-brand/5 hover:text-brand;
+  }
+
+  .game-toolbar-badge {
+    @apply max-w-[140px] truncate rounded-full bg-success/10 px-2.5 py-0.5 text-[10px] font-bold text-success sm:max-w-none sm:px-3 sm:py-1 sm:text-xs;
+  }
+
+  .game-attempt-label {
+    @apply text-xs font-semibold text-ink sm:text-sm;
+  }
+
+  .game-progress-track {
+    @apply mx-auto mt-2 flex w-full max-w-[260px] gap-1.5 sm:max-w-[280px] sm:gap-2;
+  }
+
+  .game-progress-step {
+    @apply h-1.5 flex-1 rounded-full transition-colors;
+  }
+
+  .game-casual-input-wrap {
+    @apply shrink-0;
+  }
+
+  @media (max-height: 740px) {
+    .game-shell {
+      padding-top: calc(4rem + 0.75rem);
+      @apply pb-3;
+    }
+
+    .game-shell-fill {
+      @apply h-[calc(100dvh-4rem)] pb-1.5;
+      padding-top: calc(4rem + 0.375rem);
+    }
+
+    .game-panel {
+      height: min(calc(100dvh - 5.75rem), 720px);
+      max-height: calc(100dvh - 5.75rem);
+      @apply py-1.5;
+    }
+
+    .game-panel-fill {
+      height: 100%;
+      max-height: 100%;
+    }
+
+    .game-digit-input-casual {
+      @apply size-10 text-xl;
+    }
+
+    .guess-digit-casual,
+    .guess-slot-empty-casual {
+      @apply size-9 text-base;
+    }
+
+    .game-desafio-board {
+      @apply p-1;
+    }
+
+    .game-desafio-row {
+      @apply min-h-[1.25rem] py-0;
+    }
+
+    .game-desafio-badge {
+      @apply size-[1.125rem] text-[8px];
+    }
+
+    .game-key-desafio,
+    .game-submit-desafio {
+      @apply h-8 text-sm;
+    }
+
+    .game-casual-board {
+      @apply gap-2;
+    }
+
+    .game-key-casual,
+    .game-submit-casual {
+      @apply h-10 text-lg;
+    }
+
+    .game-key,
+    .game-submit {
+      @apply h-8 text-base;
+    }
+
+    .game-toolbar-btn {
+      @apply size-8;
+    }
+
+    .game-attempt-label {
+      @apply text-[11px];
+    }
+
+    .game-casual-input-wrap {
+      @apply shrink-0;
+    }
+  }
+
+  .sr-only {
+    @apply absolute m-[-1px] h-px w-px overflow-hidden border-0 p-0 whitespace-nowrap;
+    clip: rect(0, 0, 0, 0);
+  }
+}
+
+@layer utilities {
+  .shake-anim {
+    animation: shake 0.25s;
+  }
+
+  .animate-guess-entry {
+    animation: guess-appear 0.5s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+
+  .animate-guess-row-entry {
+    animation: guess-appear 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .animate-guess-win {
+    animation: guess-win 0.7s;
+  }
+
+  .animate-guess-lose {
+    animation: guess-lose 0.7s;
+  }
+
+  .animate-table-row {
+    animation: table-row-in 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+}
