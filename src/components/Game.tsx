@@ -363,12 +363,13 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     <div
       className={cn(
         "game-shell",
-        (isDesafio || isCodigoMestre) && "game-shell-fill"
+        isDailyUi && "game-shell-fill"
       )}
     >
       <div
         className={cn(
           "game-panel",
+          isCasual && "game-panel-fill game-panel-casual",
           isDesafio && "game-panel-fill game-panel-desafio",
           isCodigoMestre && "game-panel-fill game-panel-codigo-mestre"
         )}

@@ -102,13 +102,16 @@ export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
 }) => {
   const isCasual = mode === "casual";
   const isPlaceholder = guess.every((d) => d === "");
-  const gapClass = isCasual ? "gap-2.5 sm:gap-3" : "gap-1 lg:gap-3";
+  const gapClass = isCasual ? "gap-2 sm:gap-2.5" : "gap-1 lg:gap-3";
+  const rowClass = isCasual
+    ? "flex shrink-0 flex-nowrap justify-center"
+    : "flex flex-wrap justify-center";
 
   if (mode === "casual" || mode === "codigo-mestre") {
     if (isPlaceholder) {
       if (isCasual || mode === "codigo-mestre") {
         return (
-          <div className={cn("flex flex-wrap justify-center", gapClass)}>
+          <div className={cn(rowClass, gapClass)}>
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="guess-slot-empty-casual" aria-hidden />
             ))}
@@ -140,7 +143,7 @@ export const GuessRow: React.FC<Props & GuessRowStaggerProps> = ({
     return (
       <div
         className={cn(
-          "flex flex-wrap justify-center",
+          rowClass,
           gapClass,
           animateEntry && "animate-guess-row-entry"
         )}

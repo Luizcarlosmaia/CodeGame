@@ -157,6 +157,10 @@
     max-height: 100%;
   }
 
+  .game-panel-casual {
+    @apply max-w-[min(100%,440px)] sm:max-w-[460px];
+  }
+
   .game-panel-desafio {
     @apply max-w-[min(100%,440px)] sm:max-w-[460px] lg:max-w-[500px];
   }
@@ -174,7 +178,7 @@
   }
 
   .game-codigo-mestre-input {
-    @apply size-12 appearance-none rounded-xl border-2 border-border/80 bg-surface p-0 text-center font-mono text-xl font-bold text-ink shadow-sm transition-all outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:bg-background disabled:text-ink-muted sm:size-14 sm:text-2xl;
+    @apply size-12 min-w-12 appearance-none rounded-xl border-2 border-border/80 bg-surface p-0 text-center font-mono text-xl font-bold tabular-nums text-ink shadow-sm transition-all outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:bg-background disabled:text-ink-muted sm:size-14 sm:min-w-14 sm:text-2xl;
   }
 
   .game-codigo-mestre-arrow {
@@ -266,11 +270,11 @@
   }
 
   .game-codigo-mestre-feedback-cell {
-    @apply flex flex-col items-center gap-1 rounded-xl border border-border/50 bg-surface px-1 py-2 shadow-sm;
+    @apply flex min-w-[3.25rem] shrink-0 flex-col items-center gap-1 rounded-xl border border-border/50 bg-surface px-1 py-2 shadow-sm sm:min-w-[3.5rem];
   }
 
   .game-codigo-mestre-feedback-value {
-    @apply font-mono text-lg font-bold tabular-nums text-ink sm:text-xl;
+    @apply max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-mono text-lg font-bold tabular-nums text-ink sm:text-xl;
   }
 
   .game-codigo-mestre-legend {
@@ -326,11 +330,11 @@
   }
 
   .game-casual-board {
-    @apply flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden rounded-xl border border-border/60 bg-background/70 p-2.5 sm:gap-2;
+    @apply flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-border/60 bg-background/70 p-2 sm:gap-1.5;
   }
 
   .game-casual-row {
-    @apply flex shrink-0 items-center gap-2.5;
+    @apply flex min-h-[2.5rem] shrink-0 items-center gap-2 sm:min-h-[2.75rem] sm:gap-2.5;
   }
 
   .game-casual-row-number {
@@ -338,7 +342,7 @@
   }
 
   .game-casual-row-guesses {
-    @apply flex flex-1 items-center justify-center;
+    @apply flex min-w-0 flex-1 items-center justify-center;
   }
 
   .game-desafio-board {
@@ -346,19 +350,19 @@
   }
 
   .game-desafio-rows {
-    @apply flex min-h-0 flex-1 flex-col gap-px overflow-hidden sm:gap-0.5;
+    @apply flex min-h-0 flex-1 flex-col gap-px overflow-y-auto overscroll-contain sm:gap-0.5;
   }
 
   .game-desafio-head,
   .game-desafio-row {
-    @apply grid items-center gap-1;
-    grid-template-columns: 1.25rem minmax(0, 1fr) 2.875rem 2.875rem;
+    @apply grid shrink-0 items-center gap-1;
+    grid-template-columns: 1.25rem minmax(4.25rem, 1fr) 2.5rem 2.5rem;
   }
 
   @media (min-width: 640px) {
     .game-desafio-head,
     .game-desafio-row {
-      grid-template-columns: 1.5rem minmax(0, 1fr) 3rem 3rem;
+      grid-template-columns: 1.5rem minmax(4.75rem, 1fr) 2.875rem 2.875rem;
       @apply gap-1.5;
     }
   }
@@ -388,7 +392,7 @@
   }
 
   .game-desafio-guess {
-    @apply text-xs font-semibold text-ink sm:text-sm;
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold tabular-nums text-ink sm:text-sm;
   }
 
   .game-desafio-badge {
@@ -802,7 +806,7 @@
   }
 
   .game-digit-input-casual {
-    @apply size-11 appearance-none rounded-xl border-2 border-border/80 bg-surface p-0 text-center text-2xl leading-11 font-mono text-ink shadow-sm transition-all outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:bg-background disabled:text-ink-muted sm:size-12 sm:leading-12 sm:text-[1.75rem];
+    @apply size-11 min-w-11 appearance-none rounded-xl border-2 border-border/80 bg-surface p-0 text-center text-2xl leading-11 font-mono font-bold tabular-nums text-ink shadow-sm transition-all outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:bg-background disabled:text-ink-muted sm:size-12 sm:min-w-12 sm:leading-12 sm:text-[1.75rem];
   }
 
   .game-digit-input-casual-active {
@@ -810,11 +814,11 @@
   }
 
   .guess-digit-casual {
-    @apply flex size-10 items-center justify-center rounded-lg font-mono text-lg font-bold leading-none shadow-sm sm:size-11 sm:text-xl;
+    @apply flex size-10 shrink-0 items-center justify-center rounded-lg font-mono text-lg font-bold tabular-nums leading-none shadow-sm sm:size-11 sm:text-xl;
   }
 
   .guess-slot-empty-casual {
-    @apply size-10 rounded-lg border border-dashed border-border/70 bg-background/80 sm:size-11;
+    @apply size-10 shrink-0 rounded-lg border border-dashed border-border/70 bg-background/80 sm:size-11;
   }
 
   .game-keypad-casual {
@@ -902,7 +906,11 @@
     }
 
     .game-casual-board {
-      @apply gap-2;
+      @apply gap-1;
+    }
+
+    .game-casual-row {
+      @apply min-h-[2.25rem];
     }
 
     .game-key-casual,
