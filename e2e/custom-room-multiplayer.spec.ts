@@ -117,6 +117,7 @@ test.describe("Custom room multiplayer (API + UI)", () => {
     await expect(page.getByText(/rodada 1/i)).toBeVisible({ timeout: 15_000 });
   });
 
+  test("bloqueia lobby por link sem confirmação de entrada", async ({ page }) => {
     await page.addInitScript(
       ({ roomId, userId, userName }) => {
         localStorage.setItem(`customRoomUserId_${roomId}`, userId);
