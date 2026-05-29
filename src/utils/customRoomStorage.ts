@@ -1,3 +1,5 @@
+import { authApi } from "../api/authApi";
+import { getAuthToken } from "../api/apiClient";
 import { roomsApi } from "../api/roomsApi";
 import type { CustomRoom } from "../types/customRoom";
 import { markRoomAccessGranted } from "./customRoomAccess";
@@ -24,8 +26,7 @@ export function getStoredUserIdForRoom(roomId: string): string | null {
   return localStorage.getItem(`${USER_ID_PREFIX}${roomId}`);
 }
 
-/** Salas deste dispositivo em que o usuário ainda é membro e a sala está ativa. */
-export async function fetchMyCustomRooms(): Promise<CustomRoom[]> {
+async function fetchMyRoomsFromLocalStorage(): Promise<CustomRoom[]> {
   const roomIds = getStoredCustomRoomIds();
   if (roomIds.length === 0) return [];
 
@@ -47,4 +48,41 @@ export async function fetchMyCustomRooms(): Promise<CustomRoom[]> {
   }
 
   return rooms;
+}
+
+type AccountRoomSummary = CustomRoom & {
+  inRoomMemberId?: string;
+  membershipRole?: string;
+};
+
+async function fetchMyRoomsFromAccount(): Promise<CustomRoom[]> {
+  const apiRooms = (await authApi.getMyRooms()) as AccountRoomSummary[];
+  const rooms: CustomRoom[] = [];
+
+  for (const entry of apiRooms) {
+    if (!isRoomPlayable(entry)) continue;
+
+    const memberId = entry.inRoomMemberId ?? getStoredUserIdForRoom(entry.id);
+    if (!memberId) continue;
+    if (!(entry.membros ?? []).some((m) => m.id === memberId)) continue;
+
+    localStorage.setItem(`${USER_ID_PREFIX}${entry.id}`, memberId);
+    markRoomAccessGranted(entry.id);
+    rooms.push(entry);
+  }
+
+  return rooms;
+}
+
+/** Salas ativas do usuário (conta logada ou localStorage como visitante). */
+export async function fetchMyCustomRooms(): Promise<CustomRoom[]> {
+  if (getAuthToken()) {
+    try {
+      return await fetchMyRoomsFromAccount();
+    } catch {
+      // fallback para localStorage
+    }
+  }
+
+  return fetchMyRoomsFromLocalStorage();
 }

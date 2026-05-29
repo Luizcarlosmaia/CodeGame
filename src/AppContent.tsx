@@ -17,6 +17,9 @@ import CustomRoomGame from "./components/CustomRoom/CustomRoomGame";
 import CustomRoomCreatePage from "./pages/CustomRoomCreatePage";
 import CustomRoomJoinPage from "./pages/CustomRoomJoinPage";
 import AboutPage from "./pages/AboutPage";
+import LoginPage from "./pages/LoginPage";
+import AuthGate from "./components/AuthGate";
+import AuthNoticeBanner from "./components/AuthNoticeBanner";
 import { resolveModeFromPath, getModeMaxTries, isDailyMode } from "./utils/modeLabels";
 
 function getTodayGameResult(mode: Mode, today: string): "win" | "lose" | null {
@@ -119,6 +122,7 @@ const AppContent: React.FC = () => {
   return (
     <>
       <MainMenu />
+      <AuthNoticeBanner />
       {showStats && activeDailyMode && (
         <StatsModal
           stats={statsByMode[activeDailyMode]}
@@ -133,6 +137,7 @@ const AppContent: React.FC = () => {
         <Route path="/home" element={<Home />} />
         <Route path="/ajuda" element={<HelpPage />} />
         <Route path="/sobre" element={<AboutPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/desafios" element={<DailyChallenges />} />
         <Route
           path="/cores"
@@ -171,7 +176,9 @@ const AppContent: React.FC = () => {
           path="/custom/criar"
           element={
             <div className="custom-page-wrapper">
-              <CustomRoomCreatePage />
+              <AuthGate>
+                <CustomRoomCreatePage />
+              </AuthGate>
             </div>
           }
         />

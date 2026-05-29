@@ -179,13 +179,29 @@ export function useCustomRoom(roomId?: string) {
       try {
         const data = await roomsApi.getRoom(targetRoomId);
         if (!data) throw new Error("Sala não encontrada");
+
+        if (data.accountOwnerId) {
+          const { room: updated } = await roomsApi.transferOwnership(
+            targetRoomId,
+            currentOwnerId,
+            newOwnerId
+          );
+          setRoom(updated);
+          setLoading(false);
+          return true;
+        }
+
         if (data.ownerId !== currentOwnerId) {
           throw new Error("Somente o anfitrião pode transferir a sala.");
         }
 
         const membros: RoomPlayer[] = data.membros || [];
-        if (!membros.some((member) => member.id === newOwnerId)) {
+        const target = membros.find((member) => member.id === newOwnerId);
+        if (!target) {
           throw new Error("Jogador não encontrado na sala.");
+        }
+        if (!target.accountId) {
+          throw new Error("Somente jogadores com conta logada podem ser anfitrião.");
         }
 
         const admins = Array.from(

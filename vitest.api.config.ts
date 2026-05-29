@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["server/**/*.integration.test.mjs"],
+    include: ["server/**/*.integration.test.mjs", "server/**/*.unit.test.mjs"],
   },
 });

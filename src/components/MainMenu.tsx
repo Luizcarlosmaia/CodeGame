@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "../lib/cn";
+import { HeaderAccount } from "./HeaderAccount";
 
 const LG_BREAKPOINT = 900;
 
@@ -41,7 +42,7 @@ export const MainMenu: React.FC = () => {
   return (
     <>
       <nav className="fixed left-0 top-0 z-[100] w-full border-b border-border/50 bg-surface/90 shadow-[0_1px_12px_rgba(0,0,0,0.04)] backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6 lg:px-8">
           <NavLink
             to="/home"
             onClick={(e) => handleMenuLinkClick(e, "/home", true)}
@@ -50,7 +51,7 @@ export const MainMenu: React.FC = () => {
             CODE<span className="text-brand">GAME</span>
           </NavLink>
 
-          <ul className="hidden items-center gap-0.5 lg:flex">
+          <ul className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 lg:flex">
             {menuItems.map((item) => (
               <li key={item.to}>
                 <NavLink to={item.to} className={linkClass}>
@@ -60,15 +61,24 @@ export const MainMenu: React.FC = () => {
             ))}
           </ul>
 
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            aria-label={open ? "Fechar menu" : "Abrir menu"}
-            aria-expanded={open}
-            className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-ink transition-colors hover:bg-brand/8 lg:hidden"
-          >
-            <span className="text-2xl leading-none">{open ? "✕" : "☰"}</span>
-          </button>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div className="lg:hidden">
+              <HeaderAccount variant="compact" onNavigate={handleClose} />
+            </div>
+            <div className="hidden lg:block">
+              <HeaderAccount variant="compact" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              aria-label={open ? "Fechar menu" : "Abrir menu"}
+              aria-expanded={open}
+              className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-ink transition-colors hover:bg-brand/8 lg:hidden"
+            >
+              <span className="text-2xl leading-none">{open ? "✕" : "☰"}</span>
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -84,10 +94,14 @@ export const MainMenu: React.FC = () => {
 
       <ul
         className={cn(
-          "fixed left-0 top-0 z-[300] flex h-screen w-[min(320px,85vw)] flex-col gap-1 border-r border-border/50 bg-surface px-4 pb-8 pt-20 shadow-[4px_0_24px_rgba(0,0,0,0.08)] transition-transform duration-300 lg:hidden",
+          "fixed left-0 top-0 z-[300] flex h-screen w-[min(320px,85vw)] flex-col gap-1 overflow-y-auto border-r border-border/50 bg-surface px-4 pb-8 pt-20 shadow-[4px_0_24px_rgba(0,0,0,0.04)] transition-transform duration-300 lg:hidden",
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
+        <li className="mb-3 px-1">
+          <HeaderAccount variant="drawer" onNavigate={handleClose} />
+        </li>
+
         {menuItems.map((item) => (
           <li key={item.to}>
             <NavLink

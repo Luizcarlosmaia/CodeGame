@@ -1,7 +1,13 @@
 import { test, expect } from "@playwright/test";
+import { expectDailyGameLost } from "./helpers";
 
 test.describe("Fluxo crítico - modo casual", () => {
-  test("cores → esgotar tentativas bloqueia input", async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+  });
+
+  test("cores → esgotar tentativas encerra partida", async ({ page }) => {
     await page.goto("/cores");
     await expect(page.getByRole("button", { name: /enviar palpite/i })).toBeVisible();
 
@@ -14,6 +20,6 @@ test.describe("Fluxo crítico - modo casual", () => {
       await page.getByRole("button", { name: /enviar palpite/i }).click();
     }
 
-    await expect(page.getByRole("textbox").first()).toBeDisabled({ timeout: 20_000 });
+    await expectDailyGameLost(page);
   });
 });

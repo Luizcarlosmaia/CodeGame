@@ -15,6 +15,7 @@ import {
   formatRankingPeriodoLabel,
   getNextRankingResetAt,
 } from "../utils/customRoomRankingPeriod";
+import { useAuth } from "../contexts/AuthContext";
 
 const MODE_OPTIONS: Array<{
   value: CustomRoomMode;
@@ -44,12 +45,15 @@ const MODE_OPTIONS: Array<{
 
 const CustomRoomCreatePage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [nome, setNome] = useState("");
-  const [userName, setUserName] = useState<string>(
-    typeof window !== "undefined" && window.localStorage
-      ? localStorage.getItem("customRoomUserName") || ""
-      : ""
-  );
+  const [userName, setUserName] = useState<string>(() => {
+    if (user?.displayName) return user.displayName;
+    if (typeof window !== "undefined" && window.localStorage) {
+      return localStorage.getItem("customRoomUserName") || "";
+    }
+    return "";
+  });
   const [selectedModes, setSelectedModes] = useState<Record<string, number>>(
     {}
   );
@@ -188,6 +192,7 @@ const CustomRoomCreatePage: React.FC = () => {
             terminouRodada: false,
             tentativas: [],
             progresso: [],
+            ...(user ? { accountId: user.id } : {}),
           },
         ],
         modo: Object.keys(selectedModes)[0] || "casual",

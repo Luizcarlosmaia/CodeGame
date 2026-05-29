@@ -9,6 +9,17 @@ vi.mock("./CustomRoomChat", () => ({
   default: () => <div data-testid="custom-room-chat" />,
 }));
 
+vi.mock("../../contexts/AuthContext", () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
 function renderLobby(room: ReturnType<typeof createCustomRoom>, userId: string) {
   return render(
     <BrowserRouter>

@@ -3,6 +3,14 @@ import { resolve } from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { applyPermanentRankingReset, getNextRankingResetAt } from "./customRoomRankingPeriod.mjs";
 import { applyRoomSettings } from "./customRoomSettings.mjs";
+import { getSessionUser, isAuthConfigured } from "./auth.mjs";
+import { handleAuthRequest } from "./authRoutes.mjs";
+import { handleUserRequest } from "./userRoutes.mjs";
+import {
+  createMemberResumeLink,
+  transferRoomOwnership,
+  validateMemberResume,
+} from "./roomMemberActions.mjs";
 
 function loadEnvFile() {
   try {
@@ -71,7 +79,26 @@ async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_room_messages_room_id
     ON room_messages(room_id)
   `;
-
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email TEXT UNIQUE,
+      password_hash TEXT,
+      google_sub TEXT UNIQUE,
+      display_name TEXT NOT NULL DEFAULT 'Jogador',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_room_memberships (
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+      in_room_member_id TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      joined_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (user_id, room_id)
+    )
+  `;
   schemaReady = true;
 }
 
@@ -113,6 +140,18 @@ function parseRoute(path) {
 
   if (segments[2] === "settings") {
     return { kind: "room-settings", roomId };
+  }
+
+  if (segments[2] === "transfer") {
+    return { kind: "room-transfer", roomId };
+  }
+
+  if (segments[2] === "resume") {
+    return { kind: "room-resume", roomId };
+  }
+
+  if (segments[2] === "members" && segments[4] === "resume-link") {
+    return { kind: "room-resume-link", roomId, memberId: segments[3] };
   }
 
   return null;
@@ -172,11 +211,422 @@ function assertCronAuthorized(query) {
   return query.secret === secret;
 }
 
+/** Anfitrião com conta ou sala legada (ownerId in-room). */
+function canManageRoomAsHost(room, accountUserId, inRoomUserId) {
+  if (room.accountOwnerId) {
+    if (room.accountOwnerId !== accountUserId) return false;
+    const actor = (room.membros ?? []).find((m) => m.id === inRoomUserId);
+    if (actor?.accountId) return actor.accountId === accountUserId;
+    return room.ownerId === inRoomUserId;
+  }
+  return room.ownerId === inRoomUserId;
+}
+
+function linkOwnerMemberToAccount(room, accountUserId) {
+  const ownerMemberId = room.ownerId ?? room.membros?.[0]?.id;
+  if (!ownerMemberId || !Array.isArray(room.membros)) return room;
+
+  room.membros = room.membros.map((member) =>
+    member.id === ownerMemberId
+      ? { ...member, accountId: member.accountId ?? accountUserId }
+      : member
+  );
+  return room;
+}
+
+async function upsertRoomMembership(sql, userId, roomId, memberId, role) {
+  await sql`
+    INSERT INTO user_room_memberships (user_id, room_id, in_room_member_id, role)
+    VALUES (${userId}, ${roomId}, ${memberId}, ${role})
+    ON CONFLICT (user_id, room_id)
+    DO UPDATE SET
+      in_room_member_id = EXCLUDED.in_room_member_id,
+      role = CASE
+        WHEN user_room_memberships.role = 'owner' THEN 'owner'
+        ELSE EXCLUDED.role
+      END
+  `;
+}
+
+async function handleRoomsRequest(ctx) {
+  const { method, path, query, body, headers } = ctx;
+  const sql = ctx.sql;
+  const route = parseRoute(path);
+
+  if (!route) {
+    return errorResponse(404, "Rota não encontrada");
+  }
+
+  const session = getSessionUser(headers);
+
+  if (route.kind === "rooms-cleanup-expired") {
+    if (method !== "POST") {
+      return errorResponse(405, "Método não permitido");
+    }
+
+    if (!assertCronAuthorized(query)) {
+      return errorResponse(401, "Não autorizado");
+    }
+
+    const rows = await sql`
+      DELETE FROM rooms
+      WHERE data->>'type' = 'temporaria'
+        AND data->>'expiraEm' IS NOT NULL
+        AND (data->>'expiraEm')::timestamptz <= NOW()
+      RETURNING id
+    `;
+
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        deleted: rows.length,
+        ids: rows.map((row) => row.id),
+      },
+    };
+  }
+
+  if (route.kind === "rooms-root") {
+    if (method === "GET") {
+      if (query.type !== "permanente") {
+        return errorResponse(400, "Parâmetro type=permanente é obrigatório");
+      }
+
+      const rows = await sql`
+        SELECT id, data
+        FROM rooms
+        WHERE data->>'type' = 'permanente'
+      `;
+
+      return {
+        status: 200,
+        body: rows.map((row) => ({
+          id: row.id,
+          ...row.data,
+        })),
+      };
+    }
+
+    if (method === "POST") {
+      if (!session) {
+        return errorResponse(401, "Faça login para criar uma sala");
+      }
+
+      const room = JSON.parse(body || "{}");
+      if (!room.id) {
+        return errorResponse(400, "Campo id é obrigatório");
+      }
+
+      room.accountOwnerId = session.id;
+      linkOwnerMemberToAccount(room, session.id);
+
+      if (room.type === "permanente") {
+        const periodo = room.rankingPeriodo ?? "nunca";
+        room.rankingPeriodo = periodo;
+        if (periodo !== "nunca" && !room.rankingResetEm) {
+          room.rankingResetEm = getNextRankingResetAt(periodo);
+        }
+      }
+
+      await sql`
+        INSERT INTO rooms (id, data, updated_at)
+        VALUES (${room.id}, ${JSON.stringify(room)}::jsonb, NOW())
+      `;
+
+      const ownerMemberId = room.ownerId ?? room.membros?.[0]?.id;
+      if (ownerMemberId) {
+        await upsertRoomMembership(sql, session.id, room.id, ownerMemberId, "owner");
+      }
+
+      return { status: 201, body: { ok: true, id: room.id } };
+    }
+
+    return errorResponse(405, "Método não permitido");
+  }
+
+  if (route.kind === "room-exists") {
+    if (method !== "GET") {
+      return errorResponse(405, "Método não permitido");
+    }
+
+    const room = await loadRoomWithExpiry(sql, route.roomId);
+    return { status: 200, body: { exists: room !== null } };
+  }
+
+  if (route.kind === "room-nova-partida") {
+    if (method !== "POST") {
+      return errorResponse(405, "Método não permitido");
+    }
+
+    const payload = JSON.parse(body || "{}");
+    if (!payload.userId) {
+      return errorResponse(400, "userId é obrigatório");
+    }
+
+    const current = await loadRoomWithExpiry(sql, route.roomId);
+    if (!current) {
+      return errorResponse(404, "Sala não encontrada");
+    }
+
+    if (current.type !== "temporaria") {
+      return errorResponse(400, "Nova partida só em salas temporárias");
+    }
+
+    if (isTemporaryRoomExpired(current)) {
+      return errorResponse(410, "Sala expirada");
+    }
+
+    if (current.accountOwnerId) {
+      if (!session || !canManageRoomAsHost(current, session.id, payload.userId)) {
+        return errorResponse(403, "Somente o anfitrião pode iniciar nova partida");
+      }
+    } else if (current.ownerId !== payload.userId) {
+      return errorResponse(403, "Somente o anfitrião pode iniciar nova partida");
+    }
+
+    const membros = (current.membros ?? []).map((member) => ({
+      ...member,
+      terminouRodada: false,
+      tentativas: [],
+      progresso: [],
+    }));
+
+    const updated = {
+      ...current,
+      membros,
+      ranking: [],
+      progressoRemovidos: [],
+      partidaNumero: (current.partidaNumero ?? 1) + 1,
+      aberta: true,
+      rodadaAtual: 1,
+      rodadas: (current.rodadas ?? []).map((rodada) => ({
+        ...rodada,
+        encerrada: false,
+        inicio: "",
+        fim: undefined,
+      })),
+    };
+
+    await saveRoom(sql, route.roomId, updated);
+    return { status: 200, body: { ok: true, room: updated } };
+  }
+
+  const roomActionCtx = {
+    sql,
+    session,
+    body,
+    loadRoom: (id) => loadRoomWithExpiry(sql, id),
+    saveRoom: (id, room) => saveRoom(sql, id, room),
+    canManageRoomAsHost,
+    upsertRoomMembership,
+  };
+
+  if (route.kind === "room-transfer") {
+    if (method !== "POST") {
+      return errorResponse(405, "Método não permitido");
+    }
+    if (!session) {
+      return errorResponse(401, "Login necessário para transferir a sala");
+    }
+    const payload = JSON.parse(body || "{}");
+    return transferRoomOwnership(roomActionCtx, route.roomId, payload);
+  }
+
+  if (route.kind === "room-resume") {
+    if (method !== "POST") {
+      return errorResponse(405, "Método não permitido");
+    }
+    const payload = JSON.parse(body || "{}");
+    return validateMemberResume(roomActionCtx, route.roomId, payload);
+  }
+
+  if (route.kind === "room-resume-link") {
+    if (method !== "POST") {
+      return errorResponse(405, "Método não permitido");
+    }
+    return createMemberResumeLink(roomActionCtx, route.roomId, route.memberId);
+  }
+
+  if (route.kind === "room-settings") {
+    if (method !== "POST") {
+      return errorResponse(405, "Método não permitido");
+    }
+
+    const payload = JSON.parse(body || "{}");
+    if (!payload.userId) {
+      return errorResponse(400, "userId é obrigatório");
+    }
+
+    const current = await loadRoomWithExpiry(sql, route.roomId);
+    if (!current) {
+      return errorResponse(404, "Sala não encontrada");
+    }
+
+    if (isTemporaryRoomExpired(current)) {
+      return errorResponse(410, "Sala expirada");
+    }
+
+    if (current.accountOwnerId) {
+      if (!session || !canManageRoomAsHost(current, session.id, payload.userId)) {
+        return errorResponse(403, "Somente o anfitrião pode alterar as configurações da sala");
+      }
+    }
+
+    try {
+      const updated = applyRoomSettings(current, payload);
+      await saveRoom(sql, route.roomId, updated);
+      return { status: 200, body: { ok: true, room: updated } };
+    } catch (error) {
+      return errorResponse(
+        400,
+        error instanceof Error ? error.message : "Configuração inválida"
+      );
+    }
+  }
+
+  if (route.kind === "room") {
+    if (method === "GET") {
+      const room = await loadRoomWithExpiry(sql, route.roomId);
+      if (!room) {
+        return { status: 200, body: null };
+      }
+      return { status: 200, body: room };
+    }
+
+    if (method === "PATCH") {
+      let patch = JSON.parse(body || "{}");
+      const current = await loadRoomWithExpiry(sql, route.roomId);
+
+      if (!current) {
+        return errorResponse(404, "Sala não encontrada");
+      }
+
+      if (isTemporaryRoomExpired(current)) {
+        return errorResponse(410, "Sala expirada");
+      }
+
+      if (
+        current.accountOwnerId &&
+        (patch.ownerId !== undefined || patch.accountOwnerId !== undefined)
+      ) {
+        return errorResponse(
+          403,
+          "Use POST /rooms/:id/transfer para transferir a anfitrião"
+        );
+      }
+
+      let patchMembros = patch.membros;
+      if (session && patchMembros) {
+        const prevIds = (current.membros ?? []).map((m) => m.id);
+        patchMembros = patchMembros.map((member) => {
+          if (prevIds.includes(member.id)) return member;
+          return { ...member, accountId: session.id };
+        });
+        patch = { ...patch, membros: patchMembros };
+      }
+
+      const updated = { ...current, ...patch, id: route.roomId };
+      await saveRoom(sql, route.roomId, updated);
+
+      if (session && patchMembros) {
+        const memberIds = patchMembros.map((m) => m.id);
+        const prevIds = (current.membros ?? []).map((m) => m.id);
+        const joined = memberIds.filter((id) => !prevIds.includes(id));
+        for (const memberId of joined) {
+          const role =
+            updated.ownerId === memberId && updated.accountOwnerId === session.id
+              ? "owner"
+              : "member";
+          await upsertRoomMembership(sql, session.id, route.roomId, memberId, role);
+        }
+      }
+
+      return { status: 200, body: { ok: true } };
+    }
+
+    if (method === "DELETE") {
+      const current = await loadRoom(sql, route.roomId);
+      if (current?.accountOwnerId) {
+        const payload = JSON.parse(body || "{}");
+        if (!session || current.accountOwnerId !== session.id) {
+          return errorResponse(403, "Somente o dono da conta pode excluir esta sala");
+        }
+      }
+
+      await sql`DELETE FROM rooms WHERE id = ${route.roomId}`;
+      return { status: 200, body: { ok: true } };
+    }
+
+    return errorResponse(405, "Método não permitido");
+  }
+
+  if (route.kind === "room-chat") {
+    if (method === "GET") {
+      const room = await loadRoomWithExpiry(sql, route.roomId);
+      if (!room) {
+        return errorResponse(404, "Sala não encontrada");
+      }
+
+      const rows = await sql`
+        SELECT id, user_id, user_name, text, created_at
+        FROM room_messages
+        WHERE room_id = ${route.roomId}
+        ORDER BY created_at ASC
+      `;
+
+      return {
+        status: 200,
+        body: rows.map((row) => ({
+          id: String(row.id),
+          userId: row.user_id,
+          userName: row.user_name,
+          text: row.text,
+          createdAt: row.created_at,
+        })),
+      };
+    }
+
+    if (method === "POST") {
+      const room = await loadRoomWithExpiry(sql, route.roomId);
+      if (!room) {
+        return errorResponse(404, "Sala não encontrada");
+      }
+
+      if (isTemporaryRoomExpired(room)) {
+        return errorResponse(410, "Sala expirada");
+      }
+
+      const payload = JSON.parse(body || "{}");
+
+      if (!payload.userId || !payload.userName || !payload.text) {
+        return errorResponse(400, "userId, userName e text são obrigatórios");
+      }
+
+      await sql`
+        INSERT INTO room_messages (room_id, user_id, user_name, text)
+        VALUES (
+          ${route.roomId},
+          ${payload.userId},
+          ${payload.userName},
+          ${payload.text}
+        )
+      `;
+
+      return { status: 201, body: { ok: true } };
+    }
+
+    return errorResponse(405, "Método não permitido");
+  }
+
+  return errorResponse(404, "Rota não encontrada");
+}
+
 export async function handleApiRequest({
   method,
   path,
   query = {},
   body = null,
+  headers = {},
 }) {
   if (!connectionString) {
     return errorResponse(500, "NEON_API_KEY não configurada");
@@ -185,276 +635,25 @@ export async function handleApiRequest({
   try {
     await ensureSchema();
     const sql = getSql();
+    const normalized = normalizePath(path);
+    const ctx = { method, path: normalized, query, body, headers, sql };
 
-    const route = parseRoute(normalizePath(path));
-    if (!route) {
-      return errorResponse(404, "Rota não encontrada");
+    if (normalized.startsWith("/auth")) {
+      if (!isAuthConfigured()) {
+        return errorResponse(503, "AUTH_JWT_SECRET não configurada no servidor");
+      }
+      return handleAuthRequest(ctx);
     }
 
-    if (route.kind === "rooms-cleanup-expired") {
-      if (method !== "POST") {
-        return errorResponse(405, "Método não permitido");
+    if (normalized.startsWith("/users")) {
+      if (!isAuthConfigured()) {
+        return errorResponse(503, "AUTH_JWT_SECRET não configurada no servidor");
       }
-
-      if (!assertCronAuthorized(query)) {
-        return errorResponse(401, "Não autorizado");
-      }
-
-      const rows = await sql`
-        DELETE FROM rooms
-        WHERE data->>'type' = 'temporaria'
-          AND data->>'expiraEm' IS NOT NULL
-          AND (data->>'expiraEm')::timestamptz <= NOW()
-        RETURNING id
-      `;
-
-      return {
-        status: 200,
-        body: {
-          ok: true,
-          deleted: rows.length,
-          ids: rows.map((row) => row.id),
-        },
-      };
+      return handleUserRequest(ctx);
     }
 
-    if (route.kind === "rooms-root") {
-      if (method === "GET") {
-        if (query.type !== "permanente") {
-          return errorResponse(
-            400,
-            "Parâmetro type=permanente é obrigatório"
-          );
-        }
-
-        const rows = await sql`
-          SELECT id, data
-          FROM rooms
-          WHERE data->>'type' = 'permanente'
-        `;
-
-        return {
-          status: 200,
-          body: rows.map((row) => ({
-            id: row.id,
-            ...row.data,
-          })),
-        };
-      }
-
-      if (method === "POST") {
-        const room = JSON.parse(body || "{}");
-        if (!room.id) {
-          return errorResponse(400, "Campo id é obrigatório");
-        }
-
-        if (room.type === "permanente") {
-          const periodo = room.rankingPeriodo ?? "nunca";
-          room.rankingPeriodo = periodo;
-          if (periodo !== "nunca" && !room.rankingResetEm) {
-            room.rankingResetEm = getNextRankingResetAt(periodo);
-          }
-        }
-
-        await sql`
-          INSERT INTO rooms (id, data, updated_at)
-          VALUES (${room.id}, ${JSON.stringify(room)}::jsonb, NOW())
-        `;
-
-        return { status: 201, body: { ok: true, id: room.id } };
-      }
-
-      return errorResponse(405, "Método não permitido");
-    }
-
-    if (route.kind === "room-exists") {
-      if (method !== "GET") {
-        return errorResponse(405, "Método não permitido");
-      }
-
-      const room = await loadRoomWithExpiry(sql, route.roomId);
-      return { status: 200, body: { exists: room !== null } };
-    }
-
-    if (route.kind === "room-nova-partida") {
-      if (method !== "POST") {
-        return errorResponse(405, "Método não permitido");
-      }
-
-      const payload = JSON.parse(body || "{}");
-      if (!payload.userId) {
-        return errorResponse(400, "userId é obrigatório");
-      }
-
-      const current = await loadRoomWithExpiry(sql, route.roomId);
-      if (!current) {
-        return errorResponse(404, "Sala não encontrada");
-      }
-
-      if (current.type !== "temporaria") {
-        return errorResponse(400, "Nova partida só em salas temporárias");
-      }
-
-      if (isTemporaryRoomExpired(current)) {
-        return errorResponse(410, "Sala expirada");
-      }
-
-      if (current.ownerId !== payload.userId) {
-        return errorResponse(403, "Somente o anfitrião pode iniciar nova partida");
-      }
-
-      const membros = (current.membros ?? []).map((member) => ({
-        ...member,
-        terminouRodada: false,
-        tentativas: [],
-        progresso: [],
-      }));
-
-      const updated = {
-        ...current,
-        membros,
-        ranking: [],
-        progressoRemovidos: [],
-        partidaNumero: (current.partidaNumero ?? 1) + 1,
-        aberta: true,
-        rodadaAtual: 1,
-        rodadas: (current.rodadas ?? []).map((rodada) => ({
-          ...rodada,
-          encerrada: false,
-          inicio: "",
-          fim: undefined,
-        })),
-      };
-
-      await saveRoom(sql, route.roomId, updated);
-      return { status: 200, body: { ok: true, room: updated } };
-    }
-
-    if (route.kind === "room-settings") {
-      if (method !== "POST") {
-        return errorResponse(405, "Método não permitido");
-      }
-
-      const payload = JSON.parse(body || "{}");
-      if (!payload.userId) {
-        return errorResponse(400, "userId é obrigatório");
-      }
-
-      const current = await loadRoomWithExpiry(sql, route.roomId);
-      if (!current) {
-        return errorResponse(404, "Sala não encontrada");
-      }
-
-      if (isTemporaryRoomExpired(current)) {
-        return errorResponse(410, "Sala expirada");
-      }
-
-      try {
-        const updated = applyRoomSettings(current, payload);
-        await saveRoom(sql, route.roomId, updated);
-        return { status: 200, body: { ok: true, room: updated } };
-      } catch (error) {
-        return errorResponse(
-          400,
-          error instanceof Error ? error.message : "Configuração inválida"
-        );
-      }
-    }
-
-    if (route.kind === "room") {
-      if (method === "GET") {
-        const room = await loadRoomWithExpiry(sql, route.roomId);
-        if (!room) {
-          return { status: 200, body: null };
-        }
-        return { status: 200, body: room };
-      }
-
-      if (method === "PATCH") {
-        const patch = JSON.parse(body || "{}");
-        const current = await loadRoomWithExpiry(sql, route.roomId);
-
-        if (!current) {
-          return errorResponse(404, "Sala não encontrada");
-        }
-
-        if (isTemporaryRoomExpired(current)) {
-          return errorResponse(410, "Sala expirada");
-        }
-
-        const updated = { ...current, ...patch, id: route.roomId };
-        await saveRoom(sql, route.roomId, updated);
-
-        return { status: 200, body: { ok: true } };
-      }
-
-      if (method === "DELETE") {
-        await sql`DELETE FROM rooms WHERE id = ${route.roomId}`;
-        return { status: 200, body: { ok: true } };
-      }
-
-      return errorResponse(405, "Método não permitido");
-    }
-
-    if (route.kind === "room-chat") {
-      if (method === "GET") {
-        const room = await loadRoomWithExpiry(sql, route.roomId);
-        if (!room) {
-          return errorResponse(404, "Sala não encontrada");
-        }
-
-        const rows = await sql`
-          SELECT id, user_id, user_name, text, created_at
-          FROM room_messages
-          WHERE room_id = ${route.roomId}
-          ORDER BY created_at ASC
-        `;
-
-        return {
-          status: 200,
-          body: rows.map((row) => ({
-            id: String(row.id),
-            userId: row.user_id,
-            userName: row.user_name,
-            text: row.text,
-            createdAt: row.created_at,
-          })),
-        };
-      }
-
-      if (method === "POST") {
-        const room = await loadRoomWithExpiry(sql, route.roomId);
-        if (!room) {
-          return errorResponse(404, "Sala não encontrada");
-        }
-
-        if (isTemporaryRoomExpired(room)) {
-          return errorResponse(410, "Sala expirada");
-        }
-
-        const payload = JSON.parse(body || "{}");
-
-        if (!payload.userId || !payload.userName || !payload.text) {
-          return errorResponse(
-            400,
-            "userId, userName e text são obrigatórios"
-          );
-        }
-
-        await sql`
-          INSERT INTO room_messages (room_id, user_id, user_name, text)
-          VALUES (
-            ${route.roomId},
-            ${payload.userId},
-            ${payload.userName},
-            ${payload.text}
-          )
-        `;
-
-        return { status: 201, body: { ok: true } };
-      }
-
-      return errorResponse(405, "Método não permitido");
+    if (normalized.startsWith("/rooms")) {
+      return handleRoomsRequest(ctx);
     }
 
     return errorResponse(404, "Rota não encontrada");

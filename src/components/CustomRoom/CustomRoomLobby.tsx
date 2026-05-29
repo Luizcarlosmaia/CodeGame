@@ -1,6 +1,20 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Copy, Check, Crown, Play, Trash2, LogOut, RotateCcw, Clock, UserX } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Crown,
+  Play,
+  Trash2,
+  LogOut,
+  RotateCcw,
+  Clock,
+  UserX,
+  Link2,
+} from "lucide-react";
+import { roomsApi } from "../../api/roomsApi";
+import { buildGuestResumeUrl } from "../../utils/customRoomResume";
+import { memberHasLinkedAccount } from "../../utils/customRoomMemberAccount";
 import CustomRoomChat from "./CustomRoomChat";
 import CustomRoomLobbySettings from "./CustomRoomLobbySettings";
 import { useCustomRoom } from "../../hooks/useCustomRoom";
@@ -20,6 +34,7 @@ import {
   getProtectedRoomEntryPath,
 } from "../../utils/customRoomAccess";
 import type { RoomSettingsPayload } from "../../utils/customRoomSettings";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface CustomRoomLobbyProps {
   roomId: string;
@@ -85,9 +100,20 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
   } | null>(null);
   const [transferring, setTransferring] = useState(false);
   const [kicking, setKicking] = useState(false);
+  const [copiedResumeFor, setCopiedResumeFor] = useState<string | null>(null);
+  const [resumeLinkLoading, setResumeLinkLoading] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
 
-  const isOwner = room?.ownerId === userId;
+  const canManageAsHost = useMemo(() => {
+    if (!room) return false;
+    if (room.accountOwnerId) {
+      if (!authUser || authUser.id !== room.accountOwnerId) return false;
+      const me = room.membros.find((m) => m.id === userId);
+      return me?.accountId === authUser.id;
+    }
+    return room.ownerId === userId;
+  }, [room, authUser, userId]);
   const ownerName =
     room?.membros.find((member) => member.id === room.ownerId)?.nome ?? "—";
 
@@ -133,7 +159,14 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
   }, [room?.expiraEm, isTemporary, isExpired]);
 
   React.useEffect(() => {
-    if (isLeaving || loading || !room || !userId) return;
+    if (isLeaving || loading || !room) return;
+
+    if (!userId) {
+      setPermissaoVerificada(true);
+      setTemPermissao(false);
+      navigate(getProtectedRoomEntryPath(roomId), { replace: true });
+      return;
+    }
 
     const isMember = Array.isArray(room.membros)
       ? room.membros.some((member) => member.id === userId)
@@ -146,7 +179,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
     if (!isMember || !hasAccess) {
       navigate(getProtectedRoomEntryPath(roomId), { replace: true });
     }
-  }, [room, userId, loading, isLeaving, navigate]);
+  }, [room, userId, loading, isLeaving, navigate, roomId]);
 
   React.useEffect(() => {
     if (room && room.type === "permanente" && room.aberta === false) {
@@ -172,7 +205,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
   };
 
   const handleStartNewMatch = async () => {
-    if (!room || !isOwner || startingNewMatch || isExpired) return;
+    if (!room || !canManageAsHost || startingNewMatch || isExpired) return;
 
     setStartingNewMatch(true);
     setActionError("");
@@ -229,7 +262,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
   const openLeaveOrDeleteConfirm = () => {
     if (leaving || !room) return;
     setActionError("");
-    setPendingAction(room.ownerId === userId ? "delete" : "leave");
+    setPendingAction(canManageAsHost ? "delete" : "leave");
   };
 
   const executeLeaveOrDelete = async () => {
@@ -276,11 +309,36 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
     setTransferring(false);
 
     if (!success) {
-      setActionError("Não foi possível transferir a anfitrião. Tente novamente.");
+      setActionError(
+        "Não foi possível transferir. O novo anfitrião precisa ter conta logada."
+      );
       return;
     }
 
     setTransferTarget(null);
+  };
+
+  const handleCopyGuestResumeLink = async (memberId: string) => {
+    if (!room || resumeLinkLoading) return;
+
+    setResumeLinkLoading(memberId);
+    setActionError("");
+
+    try {
+      const { resumeToken } = await roomsApi.createGuestResumeLink(
+        roomId,
+        userId,
+        memberId
+      );
+      const url = buildGuestResumeUrl(roomId, memberId, resumeToken);
+      await navigator.clipboard.writeText(url);
+      setCopiedResumeFor(memberId);
+      setTimeout(() => setCopiedResumeFor(null), 2500);
+    } catch {
+      setActionError("Não foi possível gerar o link. Tente novamente.");
+    } finally {
+      setResumeLinkLoading(null);
+    }
   };
 
   const otherMembers =
@@ -378,7 +436,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
                       <Crown size={16} aria-hidden />
                       Anfitrião:{" "}
                       <span className="font-semibold text-white">{ownerName}</span>
-                      {isOwner && (
+                      {canManageAsHost && (
                         <span className="rounded-full bg-[#ffd600]/90 px-2 py-0.5 text-[11px] font-bold text-ink">
                           Você
                         </span>
@@ -452,7 +510,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
                     <h2 className="custom-create-section-title">Participantes</h2>
                     <p className="custom-create-section-subtitle">
                       Quem está na sala agora.
-                      {isOwner && otherMembers.length > 0 && (
+                      {canManageAsHost && otherMembers.length > 0 && (
                         <> Toque nos botões ao lado de um jogador para transferir ou expulsar.</>
                       )}
                     </p>
@@ -481,7 +539,11 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
                                 {member.nome}
                               </p>
                               <p className="text-xs text-ink-muted">
-                                {isRoomOwner ? "Anfitrião" : "Jogador"}
+                                {isRoomOwner
+                                  ? "Anfitrião"
+                                  : memberHasLinkedAccount(member)
+                                    ? "Jogador · conta"
+                                    : "Jogador"}
                               </p>
                             </div>
                             {isRoomOwner && (
@@ -494,23 +556,45 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
                                 Você
                               </span>
                             )}
-                            {isOwner &&
-                              !isCurrentUser &&
-                              !isRoomOwner && (
-                                <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setTransferTarget({
-                                        id: member.id,
-                                        nome: member.nome,
-                                      })
-                                    }
-                                    className="custom-lobby-transfer-btn"
-                                  >
-                                    <Crown size={14} aria-hidden />
-                                    Tornar anfitrião
-                                  </button>
+                            {canManageAsHost && !isCurrentUser && !isRoomOwner && (
+                                <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:flex-wrap sm:justify-end">
+                                  {memberHasLinkedAccount(member) && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setTransferTarget({
+                                          id: member.id,
+                                          nome: member.nome,
+                                        })
+                                      }
+                                      className="custom-lobby-transfer-btn"
+                                    >
+                                      <Crown size={14} aria-hidden />
+                                      Tornar anfitrião
+                                    </button>
+                                  )}
+                                  {!memberHasLinkedAccount(member) && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void handleCopyGuestResumeLink(member.id)
+                                      }
+                                      disabled={resumeLinkLoading === member.id}
+                                      className="custom-lobby-transfer-btn"
+                                      title="Gera um link de uso único para outro aparelho. Depois de abrir, o anfitrião precisa gerar um novo link."
+                                    >
+                                      {copiedResumeFor === member.id ? (
+                                        <Check size={14} aria-hidden />
+                                      ) : (
+                                        <Link2 size={14} aria-hidden />
+                                      )}
+                                      {copiedResumeFor === member.id
+                                        ? "Link copiado"
+                                        : resumeLinkLoading === member.id
+                                          ? "Gerando…"
+                                          : "Link uso único"}
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -532,7 +616,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
                     </ul>
                   </section>
 
-                  {isOwner && !isExpired && (
+                  {canManageAsHost && !isExpired && (
                     <CustomRoomLobbySettings
                       room={room}
                       saving={savingSettings}
@@ -574,7 +658,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
                     {isExpired ? "Sala expirada" : "Iniciar Jogo"}
                   </button>
 
-                  {isOwner && isTemporary && !isExpired && (
+                  {canManageAsHost && isTemporary && !isExpired && (
                     <button
                       type="button"
                       onClick={handleStartNewMatch}
@@ -623,7 +707,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
                         leaving && "opacity-60"
                       )}
                     >
-                      {isOwner ? (
+                      {canManageAsHost ? (
                         <>
                           <Trash2 size={18} aria-hidden />
                           Excluir sala
@@ -650,7 +734,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
                       {isExpired ? "Sala expirada" : "Iniciar Jogo"}
                     </button>
 
-                    {isOwner && isTemporary && !isExpired && (
+                    {canManageAsHost && isTemporary && !isExpired && (
                       <button
                         type="button"
                         onClick={handleStartNewMatch}
@@ -727,7 +811,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
         title="Expulsar jogador?"
         description={
           kickTarget
-            ? `${kickTarget.nome} sairá da sala agora. O progresso fica guardado caso entre de novo.`
+            ? `${kickTarget.nome} sairá da sala agora. Links de outro aparelho deixam de valer. O progresso fica guardado se entrar de novo com o código.`
             : ""
         }
         confirmLabel="Sim, expulsar"
@@ -744,7 +828,7 @@ const CustomRoomLobby: React.FC<CustomRoomLobbyProps> = ({
         title="Transferir anfitrião?"
         description={
           transferTarget
-            ? `${transferTarget.nome} passará a controlar a sala, incluindo excluir ou transferir de novo.`
+            ? `${transferTarget.nome} passará a ser o dono da sala na conta dele(a): configurações, excluir e transferir de novo. Você deixará de ser anfitrião.`
             : ""
         }
         confirmLabel="Sim, transferir"

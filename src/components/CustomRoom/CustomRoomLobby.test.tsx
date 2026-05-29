@@ -9,6 +9,29 @@ vi.mock("./CustomRoomChat", () => ({
   default: () => <div data-testid="custom-room-chat" />,
 }));
 
+const authUser = { id: "acc-host", email: "host@test.local", displayName: "Host" };
+
+vi.mock("../../contexts/AuthContext", () => ({
+  useAuth: () => ({
+    user: authUser,
+    loading: false,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
+vi.mock("../../api/roomsApi", () => ({
+  roomsApi: {
+    createGuestResumeLink: vi.fn().mockResolvedValue({
+      ok: true,
+      memberId: "user2",
+      resumeToken: "tok-test",
+    }),
+  },
+}));
+
 const mockJoinRoom = vi.fn();
 const mockLeaveRoom = vi.fn().mockResolvedValue(true);
 const mockDeleteRoom = vi.fn().mockResolvedValue(true);
@@ -180,6 +203,32 @@ describe("CustomRoomLobby", () => {
   describe("controles exclusivos do anfitrião", () => {
     const roomWithModes: CustomRoom = {
       ...baseRoom,
+      accountOwnerId: authUser.id,
+      membros: [
+        {
+          id: "user1",
+          nome: "Dono",
+          accountId: authUser.id,
+          progresso: [],
+          terminouRodada: false,
+          tentativas: [],
+        },
+        {
+          id: "user2",
+          nome: "Visitante",
+          progresso: [],
+          terminouRodada: false,
+          tentativas: [],
+        },
+        {
+          id: "user3",
+          nome: "Com conta",
+          accountId: "acc-other",
+          progresso: [],
+          terminouRodada: false,
+          tentativas: [],
+        },
+      ],
       modos: [
         { modo: "casual", rodadas: 1 },
         { modo: "desafio", rodadas: 1 },
@@ -257,26 +306,29 @@ describe("CustomRoomLobby", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("anfitrião vê ações de transferir e expulsar outros jogadores", () => {
+    it("anfitrião vê link para visitante e transferência só para conta", () => {
       mockRoom(roomWithModes);
       renderLobby({ userId: "user1", userName: "Dono" });
 
-      expect(screen.getByRole("button", { name: /tornar anfitrião/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /expulsar/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /link uso único/i })
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /tornar anfitrião/i })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: /expulsar/i }).length).toBeGreaterThan(0);
     });
 
     it("participante não vê Nova partida em sala temporária", () => {
       mockRoom(temporaryRoom);
       renderLobby({ userId: "user2", userName: "Participante" });
 
-      expect(screen.queryByText("Nova partida")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^nova partida$/i })).not.toBeInTheDocument();
     });
 
     it("anfitrião vê Nova partida em sala temporária", () => {
       mockRoom(temporaryRoom);
       renderLobby({ userId: "user1", userName: "Dono" });
 
-      expect(screen.getAllByText("Nova partida").length).toBeGreaterThan(0);
+      expect(screen.getAllByRole("button", { name: /^nova partida$/i }).length).toBeGreaterThan(0);
     });
 
     it("participante não vê badge Você na linha do anfitrião", () => {
