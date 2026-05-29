@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { expectDailyGameLost } from "./helpers";
 
 type OverflowIssue = {
   selector: string;
@@ -72,6 +73,11 @@ for (const viewport of viewports) {
   test.describe(`Layout sem overflow — ${viewport.name}`, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } });
 
+    test.beforeEach(async ({ page }) => {
+      await page.goto("/");
+      await page.evaluate(() => localStorage.clear());
+    });
+
     test("modo Cores com 6 tentativas preenchidas", async ({ page }) => {
       await page.goto("/cores");
       await expect(page.getByRole("button", { name: /enviar palpite/i })).toBeVisible();
@@ -80,9 +86,7 @@ for (const viewport of viewports) {
         await submitDigitGuess(page, ["9", "8", "7", "6"]);
       }
 
-      await expect(page.getByRole("textbox").first()).toBeDisabled({
-        timeout: 20_000,
-      });
+      await expectDailyGameLost(page);
 
       const issues = await collectOverflow(page, GAME_CELL_SELECTORS);
       expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
@@ -96,9 +100,7 @@ for (const viewport of viewports) {
         await submitDigitGuess(page, ["9", "9", "9", "9"]);
       }
 
-      await expect(page.getByRole("textbox").first()).toBeDisabled({
-        timeout: 30_000,
-      });
+      await expectDailyGameLost(page);
 
       const issues = await collectOverflow(page, GAME_CELL_SELECTORS);
       expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
@@ -127,9 +129,7 @@ for (const viewport of viewports) {
         await submitDigitGuess(page, guess);
       }
 
-      await expect(page.getByRole("textbox").first()).toBeDisabled({
-        timeout: 30_000,
-      });
+      await expectDailyGameLost(page);
 
       const issues = await collectOverflow(page, GAME_CELL_SELECTORS);
       expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);

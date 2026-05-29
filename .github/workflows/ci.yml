@@ -72,6 +72,7 @@ jobs:
     env:
       CI: true
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      AUTH_JWT_SECRET: ${{ secrets.AUTH_JWT_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,4 +95,5 @@ jobs:
             echo "NEON_API_KEY não configurada; pulando testes E2E."
             exit 0
           fi
+          export AUTH_JWT_SECRET="${AUTH_JWT_SECRET:-ci-e2e-jwt-secret-min-16-chars}"
           npm run test:e2e

@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
+import { registerE2EUser } from "./helpers";
 
 const API_BASE = process.env.PLAYWRIGHT_API_URL ?? "http://localhost:3001/api";
 const OWNER_ID = "pw-owner";
@@ -71,10 +72,14 @@ async function addGuestMember(request: APIRequestContext, roomId: string) {
 
 test.describe("Custom room multiplayer (API + UI)", () => {
   let roomId = "";
+  let authHeaders: Record<string, string> = {};
 
   test.beforeAll(async ({ request }) => {
+    const auth = await registerE2EUser(request);
+    authHeaders = auth.headers;
     roomId = `E2E-PW-${Date.now()}`;
     const response = await request.post(`${API_BASE}/rooms`, {
+      headers: authHeaders,
       data: createRoomPayload(roomId),
     });
     expect(response.ok()).toBeTruthy();
@@ -82,8 +87,8 @@ test.describe("Custom room multiplayer (API + UI)", () => {
   });
 
   test.afterAll(async ({ request }) => {
-    if (roomId) {
-      await request.delete(`${API_BASE}/rooms/${roomId}`);
+    if (roomId && authHeaders.authorization) {
+      await request.delete(`${API_BASE}/rooms/${roomId}`, { headers: authHeaders });
     }
   });
 
