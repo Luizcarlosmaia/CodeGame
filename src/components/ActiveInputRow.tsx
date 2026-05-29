@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { getStatuses } from "../utils/getFeedback";
 import { cn } from "../lib/cn";
+import { isTouchDevice } from "../lib/isTouchDevice";
 
 interface ActiveInputRowProps {
   inputDigits: string[];
@@ -40,6 +41,7 @@ export const ActiveInputRow: React.FC<ActiveInputRowProps> = ({
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const isCasual = variant === "casual";
+  const touchOnly = isTouchDevice();
 
   const showFeedback =
     (inputDigits.every((d) => d && d !== "") && guessesLength > 0) ||
@@ -60,13 +62,17 @@ export const ActiveInputRow: React.FC<ActiveInputRowProps> = ({
     if (isCodigoMestre) {
       if (newVal.length > 2) newVal = newVal.slice(0, 2);
       onChange(newVal, idx);
-      if ((newVal.length === 2 || parseInt(newVal, 10) > 9) && idx < 3) {
+      if (
+        !touchOnly &&
+        (newVal.length === 2 || parseInt(newVal, 10) > 9) &&
+        idx < 3
+      ) {
         inputRefs.current[idx + 1]?.focus();
       }
     } else {
       if (newVal.length > 1) newVal = newVal[0];
       onChange(newVal, idx);
-      if (newVal && idx < 3) inputRefs.current[idx + 1]?.focus();
+      if (!touchOnly && newVal && idx < 3) inputRefs.current[idx + 1]?.focus();
     }
   };
 
@@ -91,13 +97,19 @@ export const ActiveInputRow: React.FC<ActiveInputRowProps> = ({
       key={i}
       value={digit}
       onChange={(e) => handleInputChange(e.target.value, i)}
-      onFocus={() => setFocusedIndex(i)}
+      onClick={() => setFocusedIndex(i)}
+      onFocus={(e) => {
+        setFocusedIndex(i);
+        if (touchOnly) e.currentTarget.blur();
+      }}
       maxLength={isCodigoMestre && modoVisual ? 2 : isCodigoMestre ? 2 : 1}
       ref={(el) => {
         inputRefs.current[i] = el;
       }}
       disabled={hasWon || isLost}
-      inputMode="numeric"
+      readOnly={touchOnly}
+      inputMode={touchOnly ? "none" : "numeric"}
+      autoComplete="off"
       aria-label={`Dígito ${i + 1}`}
       className={cn(
         isCasual ? "game-digit-input-casual" : "game-digit-input",

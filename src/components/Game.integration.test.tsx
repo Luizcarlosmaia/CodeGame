@@ -103,10 +103,10 @@ describe("Game integração - vitória e derrota", () => {
     expect(statsResult!.totalWins).toBeGreaterThan(0);
 
     await waitFor(() => {
-      screen.getAllByRole("textbox").forEach((input) => {
-        expect(input).toBeDisabled();
-      });
+      expect(screen.getByText(/você acertou o código/i)).toBeInTheDocument();
     });
+    expect(screen.queryByRole("button", { name: /enviar palpite/i })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
   });
 
   it("exibe mensagem de derrota, atualiza stats e bloqueia input após perder", async () => {
@@ -123,9 +123,9 @@ describe("Game integração - vitória e derrota", () => {
     expect(statsResult!.totalGames).toBeGreaterThan(0);
 
     await waitFor(() => {
-      screen.getAllByRole("textbox").forEach((input) => {
-        expect(input).toBeDisabled();
-      });
+      expect(screen.getByText(/não foi dessa vez/i)).toBeInTheDocument();
     });
+    expect(screen.queryByRole("button", { name: /enviar palpite/i })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
   });
 });

@@ -186,7 +186,7 @@
   }
 
   .game-codigo-mestre-arrow-sm {
-    @apply size-8 text-base sm:size-9 sm:text-lg;
+    @apply size-6 text-sm sm:size-8 sm:text-base;
   }
 
   .game-codigo-mestre-arrow-correct {
@@ -202,11 +202,15 @@
   }
 
   .game-codigo-mestre-main {
-    @apply flex min-h-0 flex-1 flex-col items-stretch justify-start gap-3 py-1;
+    @apply flex min-h-0 flex-1 flex-col items-stretch justify-start gap-2 overflow-hidden py-0;
+  }
+
+  .game-main-codigo-mestre {
+    @apply min-h-0 overflow-hidden;
   }
 
   .game-codigo-mestre-panel {
-    @apply flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-2xl border border-border/60 bg-background/70 px-4 py-5 sm:px-5 sm:py-6;
+    @apply flex min-h-0 flex-1 flex-col items-center justify-start gap-2 overflow-hidden rounded-2xl border border-border/60 bg-background/70 px-3 py-3 sm:items-center sm:justify-center sm:gap-3 sm:px-4 sm:py-4;
   }
 
   .game-codigo-mestre-progress {
@@ -270,11 +274,11 @@
   }
 
   .game-codigo-mestre-feedback-cell {
-    @apply flex min-w-[3.25rem] shrink-0 flex-col items-center gap-1 rounded-xl border border-border/50 bg-surface px-1 py-2 shadow-sm sm:min-w-[3.5rem];
+    @apply flex min-w-[2.75rem] shrink-0 flex-col items-center gap-0.5 rounded-xl border border-border/50 bg-surface px-0.5 py-1.5 shadow-sm sm:min-w-[3.25rem] sm:gap-1 sm:px-1 sm:py-2;
   }
 
   .game-codigo-mestre-feedback-value {
-    @apply max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-mono text-lg font-bold tabular-nums text-ink sm:text-xl;
+    @apply max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-mono text-base font-bold tabular-nums text-ink sm:text-lg;
   }
 
   .game-codigo-mestre-legend {
@@ -314,7 +318,11 @@
   }
 
   .game-result-banner {
-    @apply mx-auto my-3 flex w-full max-w-full shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold shadow-sm sm:my-3.5 sm:px-4 sm:py-3 sm:text-sm;
+    @apply mx-auto flex w-full max-w-full shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm sm:px-4 sm:py-2.5 sm:text-sm;
+  }
+
+  .game-result-banner-header {
+    @apply my-0;
   }
 
   .game-result-banner-win {
@@ -330,11 +338,11 @@
   }
 
   .game-casual-board {
-    @apply flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-border/60 bg-background/70 p-2 sm:gap-1.5;
+    @apply flex min-h-0 flex-1 flex-col gap-1 overflow-hidden overscroll-contain rounded-xl border border-border/60 bg-background/70 p-2 sm:gap-1;
   }
 
   .game-casual-row {
-    @apply flex min-h-[2.5rem] shrink-0 items-center gap-2 sm:min-h-[2.75rem] sm:gap-2.5;
+    @apply flex min-h-0 flex-1 items-center gap-2 sm:gap-2.5;
   }
 
   .game-casual-row-number {
@@ -350,7 +358,7 @@
   }
 
   .game-desafio-rows {
-    @apply flex min-h-0 flex-1 flex-col gap-px overflow-y-auto overscroll-contain sm:gap-0.5;
+    @apply flex min-h-0 flex-1 flex-col gap-px overflow-hidden sm:gap-0.5;
   }
 
   .game-desafio-head,
@@ -372,7 +380,7 @@
   }
 
   .game-desafio-row {
-    @apply min-h-[1.375rem] flex-1 rounded-md px-1 py-0 sm:min-h-[1.5rem] sm:rounded-lg sm:py-0.5;
+    @apply min-h-0 flex-1 overflow-hidden rounded-md px-1 py-0 sm:min-h-[1.5rem] sm:rounded-lg;
   }
 
   .game-desafio-head-stat {
@@ -396,7 +404,7 @@
   }
 
   .game-desafio-badge {
-    @apply mx-auto inline-flex size-5 items-center justify-center rounded-md text-[9px] font-bold sm:size-6 sm:text-[10px];
+    @apply mx-auto inline-flex h-[1.125rem] w-[1.125rem] max-h-full shrink-0 items-center justify-center rounded-md text-[9px] font-bold sm:h-[1.25rem] sm:w-[1.25rem] sm:text-[10px];
   }
 
   .game-controls-desafio {
@@ -883,21 +891,16 @@
       @apply size-10 text-xl;
     }
 
-    .guess-digit-casual,
-    .guess-slot-empty-casual {
-      @apply size-9 text-base;
-    }
-
     .game-desafio-board {
       @apply p-1;
     }
 
     .game-desafio-row {
-      @apply min-h-[1.25rem] py-0;
+      @apply min-h-0 py-0;
     }
 
     .game-desafio-badge {
-      @apply size-[1.125rem] text-[8px];
+      @apply h-4 w-4 text-[8px];
     }
 
     .game-key-desafio,
@@ -906,11 +909,32 @@
     }
 
     .game-casual-board {
-      @apply gap-1;
+      @apply gap-0.5 p-1.5;
     }
 
     .game-casual-row {
-      @apply min-h-[2.25rem];
+      @apply min-h-0;
+    }
+
+    .guess-digit-casual,
+    .guess-slot-empty-casual {
+      @apply size-8 text-sm sm:size-9;
+    }
+
+    .game-codigo-mestre-input {
+      @apply size-11 min-w-11 text-lg;
+    }
+
+    .game-codigo-mestre-panel {
+      @apply gap-1.5 px-2.5 py-2;
+    }
+
+    .game-codigo-mestre-feedback-cell {
+      @apply min-w-[2.5rem] py-1;
+    }
+
+    .game-codigo-mestre-feedback-value {
+      @apply text-sm;
     }
 
     .game-key-casual,

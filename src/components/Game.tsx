@@ -31,6 +31,7 @@ import {
 } from "../utils/gameState";
 import { getModeDisplay, getModeMaxTries, isDailyMode } from "../utils/modeLabels";
 import { isCodigoMestreGuessCorrect, isDigitModeGuessCorrect } from "../utils/verifyGuess";
+import { isTouchDevice } from "../lib/isTouchDevice";
 
 function buildInitialGameState(
   day: string,
@@ -147,8 +148,26 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
   const inputDigits = inputDigitsProp ?? inputDigitsState;
   const setInputDigits = setInputDigitsProp ?? setInputDigitsState;
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const focusField = (i = 0) => inputRefs.current[i]?.focus();
-  useEffect(focusField, []);
+  const focusField = (i = 0) => {
+    if (!isTouchDevice()) inputRefs.current[i]?.focus();
+  };
+  const setCodigoMestreFocus = (i: number) => {
+    (window as unknown as { codigoMestreFocus: number }).codigoMestreFocus = i;
+  };
+  const advanceField = (fromIdx: number) => {
+    if (fromIdx >= 3) return;
+    if (isTouchDevice() && isCodigoMestre) {
+      setCodigoMestreFocus(fromIdx + 1);
+    } else {
+      focusField(fromIdx + 1);
+    }
+  };
+  useEffect(() => {
+    focusField();
+    if (isCodigoMestre) {
+      setCodigoMestreFocus(0);
+    }
+  }, []);
 
   // Estado do jogo: controlado ou não
   const secretCode = codeProp ?? gameState[mode]!.code;
@@ -159,6 +178,7 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     maxTriesOverride ??
     (isDailyMode(mode) ? getModeMaxTries(mode) : Infinity);
   const isLost = !hasWon && guesses.length >= maxTries;
+  const isGameOver = hasWon || isLost;
   const isCasual = mode === "casual";
   const isDesafio = mode === "desafio";
   const isDailyUi = isCasual || isDesafio || isCodigoMestre;
@@ -219,13 +239,16 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     if (!valid) return;
     if (onInputChange) {
       onInputChange(newVal, idx);
+      if (isCodigoMestre && newVal.length === 2 && idx < 3) {
+        advanceField(idx);
+      }
       return;
     }
     const next = [...inputDigits];
     next[idx] = newVal;
     setInputDigits(next);
     if (isCodigoMestre) {
-      if (newVal.length === 2 && idx < 3) focusField(idx + 1);
+      if (newVal.length === 2 && idx < 3) advanceField(idx);
     } else if (newVal && idx < 3) {
       focusField(idx + 1);
     }
@@ -343,22 +366,6 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
     handleGuess();
   };
 
-  let result: "win" | "lose" | null = null;
-  let playedToday = false;
-  if (mode === "casual" || mode === "desafio" || mode === "codigo-mestre") {
-    const stats = loadStats(mode);
-    const todayStr = today;
-    playedToday =
-      stats.date === todayStr && stats.totalGames > 0 && (hasWon || isLost);
-    if (playedToday) {
-      if (hasWon) {
-        result = "win";
-      } else if (isLost) {
-        result = "lose";
-      }
-    }
-  }
-
   return (
     <div
       className={cn(
@@ -389,40 +396,60 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
                   {modeDisplay.badge}
                 </span>
               )}
-              <div className="mt-1.5 pb-0.5 text-center">
-                <p className="game-attempt-label">
-                  Tentativa {currentAttempt} de {maxTries}
-                </p>
-                {isCasual ? (
-                  <div className="game-progress-track">
-                    {Array.from({ length: maxTries }).map((_, index) => (
-                      <span
-                        key={index}
+              {isGameOver ? (
+                <div className="mt-1.5 pb-0.5">
+                  {hasWon ? (
+                    <div className="game-result-banner game-result-banner-win game-result-banner-header">
+                      <span className="text-base leading-none">🎉</span>
+                      <span>Você acertou o código!</span>
+                    </div>
+                  ) : (
+                    <div className="game-result-banner game-result-banner-lose game-result-banner-header">
+                      <span className="text-base leading-none">😞</span>
+                      <span>
+                        {isCodigoMestre
+                          ? "Não foi dessa vez! Veja o código abaixo."
+                          : "Não foi dessa vez!"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-1.5 pb-0.5 text-center">
+                  <p className="game-attempt-label">
+                    Tentativa {currentAttempt} de {maxTries}
+                  </p>
+                  {isCasual ? (
+                    <div className="game-progress-track">
+                      {Array.from({ length: maxTries }).map((_, index) => (
+                        <span
+                          key={index}
+                          className={cn(
+                            "game-progress-step",
+                            index < guesses.length
+                              ? hasWon && index === guesses.length - 1
+                                ? "bg-success"
+                                : "bg-brand"
+                              : index === guesses.length && !hasWon && !isLost
+                                ? "bg-brand/40"
+                                : "bg-border/80"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="game-progress-bar mx-auto mt-2 h-1.5 max-w-[260px] overflow-hidden rounded-full bg-border/80">
+                      <div
                         className={cn(
-                          "game-progress-step",
-                          index < guesses.length
-                            ? hasWon && index === guesses.length - 1
-                              ? "bg-success"
-                              : "bg-brand"
-                            : index === guesses.length && !hasWon && !isLost
-                              ? "bg-brand/40"
-                              : "bg-border/80"
+                          "h-full rounded-full transition-all duration-300",
+                          isCodigoMestre ? "bg-[#f59e0b]" : "bg-brand"
                         )}
+                        style={{ width: `${progressPercent}%` }}
                       />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="game-progress-bar mx-auto mt-2 h-1.5 max-w-[260px] overflow-hidden rounded-full bg-border/80">
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-all duration-300",
-                        isCodigoMestre ? "bg-[#f59e0b]" : "bg-brand"
-                      )}
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -442,36 +469,21 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
         <div
           className={cn(
             "game-main",
-            mode === "codigo-mestre" && "justify-center"
+            isCodigoMestre && "game-main-codigo-mestre"
           )}
         >
-          {playedToday && result === "win" && (
-            <div className="game-result-banner game-result-banner-win">
-              <span className="text-base leading-none">🎉</span>
-              <span>Você acertou o código!</span>
-            </div>
-          )}
-          {playedToday && result === "lose" && (
-            <div className="game-result-banner game-result-banner-lose">
-              <span className="text-base leading-none">😞</span>
-              <span>
-                {isCodigoMestre
-                  ? "Não foi dessa vez! Veja o código abaixo."
-                  : "Não foi dessa vez!"}
-              </span>
-            </div>
-          )}
-
           {isCodigoMestre ? (
             <div className="game-codigo-mestre-main">
-              <CodigoMestreInputRow
-                inputDigits={inputDigits}
-                onChange={handleChange}
-                inputRefs={inputRefs}
-                hasWon={hasWon}
-                isLost={isLost}
-                shakeInput={shakeInput}
-              />
+              {!isGameOver && (
+                <CodigoMestreInputRow
+                  inputDigits={inputDigits}
+                  onChange={handleChange}
+                  inputRefs={inputRefs}
+                  hasWon={hasWon}
+                  isLost={isLost}
+                  shakeInput={shakeInput}
+                />
+              )}
 
               <CodigoMestreFeedback
                 guesses={guesses}
@@ -483,23 +495,22 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
 
             </div>
           ) : (
-            <ActiveInputRow
-              inputDigits={inputDigits}
-              secretCode={secretCode}
-              isCodigoMestre={isCodigoMestre}
-              onChange={handleChange}
-              inputRefs={inputRefs}
-              hasWon={hasWon}
-              isLost={isLost}
-              guessesLength={guesses.length}
-              modoVisual={false}
-              shakeInput={shakeInput}
-              variant={isDailyUi ? "casual" : "default"}
-            />
-          )}
-
-          {!isCodigoMestre && (
             <>
+              {!isGameOver && (
+                <ActiveInputRow
+                  inputDigits={inputDigits}
+                  secretCode={secretCode}
+                  isCodigoMestre={isCodigoMestre}
+                  onChange={handleChange}
+                  inputRefs={inputRefs}
+                  hasWon={hasWon}
+                  isLost={isLost}
+                  guessesLength={guesses.length}
+                  modoVisual={false}
+                  shakeInput={shakeInput}
+                  variant={isDailyUi ? "casual" : "default"}
+                />
+              )}
               {isCasual && (
                 <>
                   <div className="game-legend mt-1">
@@ -627,6 +638,7 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
           )}
         </div>
 
+        {!isGameOver && (
         <footer
           className={cn(
             "game-controls",
@@ -696,6 +708,7 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
                     if (current.length > 0) {
                       handleChange(current.slice(0, -1), idx);
                     } else if (idx > 0) {
+                      if (isTouchDevice()) setCodigoMestreFocus(idx - 1);
                       handleChange("", idx - 1);
                     }
                   } else {
@@ -725,6 +738,7 @@ export const Game: React.FC<GameProps & { backTo?: string }> = ({
             </button>
           </div>
         </footer>
+        )}
         </form>
       </div>
     </div>
