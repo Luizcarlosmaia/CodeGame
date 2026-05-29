@@ -216,9 +216,22 @@ function canManageRoomAsHost(room, accountUserId, inRoomUserId) {
   if (room.accountOwnerId) {
     if (room.accountOwnerId !== accountUserId) return false;
     const actor = (room.membros ?? []).find((m) => m.id === inRoomUserId);
-    return actor?.accountId === accountUserId;
+    if (actor?.accountId) return actor.accountId === accountUserId;
+    return room.ownerId === inRoomUserId;
   }
   return room.ownerId === inRoomUserId;
+}
+
+function linkOwnerMemberToAccount(room, accountUserId) {
+  const ownerMemberId = room.ownerId ?? room.membros?.[0]?.id;
+  if (!ownerMemberId || !Array.isArray(room.membros)) return room;
+
+  room.membros = room.membros.map((member) =>
+    member.id === ownerMemberId
+      ? { ...member, accountId: member.accountId ?? accountUserId }
+      : member
+  );
+  return room;
 }
 
 async function upsertRoomMembership(sql, userId, roomId, memberId, role) {
@@ -305,6 +318,7 @@ async function handleRoomsRequest(ctx) {
       }
 
       room.accountOwnerId = session.id;
+      linkOwnerMemberToAccount(room, session.id);
 
       if (room.type === "permanente") {
         const periodo = room.rankingPeriodo ?? "nunca";
