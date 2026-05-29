@@ -10,15 +10,43 @@ function randomRoomId() {
   return `E2E-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+async function registerE2EUser() {
+  process.env.AUTH_JWT_SECRET =
+    process.env.AUTH_JWT_SECRET || "e2e-test-secret-min-16-chars";
+  const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@test.local`;
+  const reg = await handleApiRequest({
+    method: "POST",
+    path: "/api/auth/register",
+    body: JSON.stringify({
+      email,
+      password: "testpassword123",
+      displayName: "E2E Owner",
+    }),
+    headers: {},
+  });
+  if (reg.status !== 201) {
+    throw new Error(`Falha ao registrar usuário E2E: ${JSON.stringify(reg.body)}`);
+  }
+  return {
+    headers: { authorization: `Bearer ${reg.body.token}` },
+    accountUserId: reg.body.user.id,
+  };
+}
+
 describe.skipIf(!runApiE2E)("API E2E - salas custom", () => {
   const roomId = randomRoomId();
   const ownerId = "e2e-owner";
   const guestId = "e2e-guest";
+  let authHeaders = {};
 
   beforeAll(async () => {
+    const auth = await registerE2EUser();
+    authHeaders = auth.headers;
+
     const create = await handleApiRequest({
       method: "POST",
       path: "/api/rooms",
+      headers: authHeaders,
       body: JSON.stringify({
         id: roomId,
         nome: "Sala E2E",
@@ -46,12 +74,14 @@ describe.skipIf(!runApiE2E)("API E2E - salas custom", () => {
     });
 
     expect(create.status).toBe(201);
+    expect(create.body.id).toBe(roomId);
   });
 
   afterAll(async () => {
     await handleApiRequest({
       method: "DELETE",
       path: `/api/rooms/${roomId}`,
+      headers: authHeaders,
     });
   });
 
@@ -136,6 +166,7 @@ describe.skipIf(!runApiE2E)("API E2E - salas custom", () => {
     const withModes = await handleApiRequest({
       method: "POST",
       path: `/api/rooms/${roomId}/settings`,
+      headers: authHeaders,
       body: JSON.stringify({
         userId: ownerId,
         modos: [
@@ -152,6 +183,7 @@ describe.skipIf(!runApiE2E)("API E2E - salas custom", () => {
     const removeMode = await handleApiRequest({
       method: "POST",
       path: `/api/rooms/${roomId}/settings`,
+      headers: authHeaders,
       body: JSON.stringify({
         userId: ownerId,
         modos: [{ modo: "casual", rodadas: 1 }],
@@ -167,11 +199,16 @@ describe.skipIf(!runApiE2E)("API E2E - abandonar e excluir sala", () => {
   const roomId = randomRoomId();
   const ownerId = "e2e-leave-owner";
   const guestId = "e2e-leave-guest";
+  let authHeaders = {};
 
   beforeAll(async () => {
+    const auth = await registerE2EUser();
+    authHeaders = auth.headers;
+
     const create = await handleApiRequest({
       method: "POST",
       path: "/api/rooms",
+      headers: authHeaders,
       body: JSON.stringify({
         id: roomId,
         nome: "Sala Leave E2E",
@@ -256,6 +293,7 @@ describe.skipIf(!runApiE2E)("API E2E - abandonar e excluir sala", () => {
     const deleted = await handleApiRequest({
       method: "DELETE",
       path: `/api/rooms/${roomId}`,
+      headers: authHeaders,
     });
     expect(deleted.status).toBe(200);
 
@@ -272,11 +310,16 @@ describe.skipIf(!runApiE2E)("API E2E - sala temporária", () => {
   const ownerId = "e2e-temp-owner";
   const futureExpiry = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString();
   const pastExpiry = new Date(Date.now() - 60_000).toISOString();
+  let authHeaders = {};
 
   beforeAll(async () => {
+    const auth = await registerE2EUser();
+    authHeaders = auth.headers;
+
     const create = await handleApiRequest({
       method: "POST",
       path: "/api/rooms",
+      headers: authHeaders,
       body: JSON.stringify({
         id: tempRoomId,
         nome: "Sala Temp E2E",
@@ -323,6 +366,7 @@ describe.skipIf(!runApiE2E)("API E2E - sala temporária", () => {
     await handleApiRequest({
       method: "DELETE",
       path: `/api/rooms/${tempRoomId}`,
+      headers: authHeaders,
     });
   });
 
@@ -330,6 +374,7 @@ describe.skipIf(!runApiE2E)("API E2E - sala temporária", () => {
     const response = await handleApiRequest({
       method: "POST",
       path: `/api/rooms/${tempRoomId}/nova-partida`,
+      headers: authHeaders,
       body: JSON.stringify({ userId: ownerId }),
     });
 
@@ -347,6 +392,7 @@ describe.skipIf(!runApiE2E)("API E2E - sala temporária", () => {
     await handleApiRequest({
       method: "POST",
       path: "/api/rooms",
+      headers: authHeaders,
       body: JSON.stringify({
         id: permanent,
         nome: "Perm",
@@ -384,6 +430,7 @@ describe.skipIf(!runApiE2E)("API E2E - sala temporária", () => {
     await handleApiRequest({
       method: "DELETE",
       path: `/api/rooms/${permanent}`,
+      headers: authHeaders,
     });
   });
 
@@ -392,6 +439,7 @@ describe.skipIf(!runApiE2E)("API E2E - sala temporária", () => {
     await handleApiRequest({
       method: "POST",
       path: "/api/rooms",
+      headers: authHeaders,
       body: JSON.stringify({
         id: expiredRoomId,
         nome: "Expirada",
@@ -435,6 +483,7 @@ describe.skipIf(!runApiE2E)("API E2E - sala temporária", () => {
     await handleApiRequest({
       method: "DELETE",
       path: `/api/rooms/${expiredRoomId}`,
+      headers: authHeaders,
     });
   });
 });

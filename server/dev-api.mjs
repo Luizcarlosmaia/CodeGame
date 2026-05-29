@@ -5,8 +5,9 @@ const PORT = Number(process.env.API_PORT ?? 3001);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+  "Access-Control-Allow-Credentials": "true",
   "Content-Type": "application/json",
 };
 
@@ -17,6 +18,18 @@ function readBody(req) {
     req.on("end", () => resolvePromise(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
+}
+
+function buildResponseHeaders(result) {
+  const headers = { ...corsHeaders };
+  if (result.redirect) {
+    headers.Location = result.redirect;
+    delete headers["Content-Type"];
+  }
+  if (result.setCookie) {
+    headers["Set-Cookie"] = result.setCookie;
+  }
+  return headers;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -42,9 +55,17 @@ const server = http.createServer(async (req, res) => {
       path: url.pathname,
       query: Object.fromEntries(url.searchParams.entries()),
       body,
+      headers: req.headers,
     });
 
-    res.writeHead(result.status, corsHeaders);
+    if (result.redirect) {
+      const headers = buildResponseHeaders(result);
+      res.writeHead(result.status, headers);
+      res.end();
+      return;
+    }
+
+    res.writeHead(result.status, buildResponseHeaders(result));
     res.end(JSON.stringify(result.body));
   } catch (error) {
     console.error(error);

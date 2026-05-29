@@ -11,6 +11,8 @@ import {
 } from "../utils/customRoomLifecycle";
 import { fetchMyCustomRooms } from "../utils/customRoomStorage";
 import { markRoomAccessGranted } from "../utils/customRoomAccess";
+import { applyGuestResumeFromUrl, parseResumeSearchParams } from "../utils/customRoomResume";
+import { useAuth } from "../contexts/AuthContext";
 import type { RoomType } from "../types/customRoom";
 
 type MyRoom = {
@@ -35,6 +37,7 @@ const CustomRoomJoinPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { joinRoom } = useCustomRoom();
+  const { user: authUser } = useAuth();
 
   const [userName, setUserName] = useState(
     () => localStorage.getItem("customRoomUserName") || ""
@@ -79,6 +82,25 @@ const CustomRoomJoinPage: React.FC = () => {
       setJoinId(normalizeRoomCode(codeFromUrl));
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const codeFromUrl = searchParams.get("codigo");
+    const { memberId, token } = parseResumeSearchParams(
+      searchParams.toString() ? `?${searchParams.toString()}` : ""
+    );
+    if (!codeFromUrl || !memberId || !token) return;
+
+    const roomCode = normalizeRoomCode(codeFromUrl);
+    void (async () => {
+      const ok = await applyGuestResumeFromUrl(
+        roomCode,
+        `?member=${encodeURIComponent(memberId)}&token=${encodeURIComponent(token)}`
+      );
+      if (ok) {
+        navigate(`/custom/lobby/${roomCode}`, { replace: true });
+      }
+    })();
+  }, [searchParams, navigate]);
 
   const totalMyRooms = myRooms.length;
 
@@ -134,6 +156,7 @@ const CustomRoomJoinPage: React.FC = () => {
       nome: trimmedName,
       terminouRodada: false,
       tentativas: [],
+      ...(authUser ? { accountId: authUser.id } : {}),
     });
 
     if (joinResult === "already_joined" || joinResult === true) {

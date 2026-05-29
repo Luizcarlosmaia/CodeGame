@@ -6,6 +6,10 @@ export type RoomMode = "casual" | "desafio" | string;
 export interface RoomPlayer {
   id: string;
   nome: string;
+  /** Conta logada vinculada a este jogador na sala */
+  accountId?: string;
+  /** Token para link de retomada em outro aparelho (visitantes) */
+  resumeToken?: string;
   terminouRodada: boolean;
   tentativas: number[]; // tentativas por rodada
   progresso?: Array<{
@@ -40,6 +44,8 @@ export interface CustomRoom {
   id: string;
   nome: string;
   type: RoomType;
+  /** UUID da conta dona (salas criadas após login) */
+  accountOwnerId?: string;
   ownerId: string;
   masterId?: string;
   admins: string[];

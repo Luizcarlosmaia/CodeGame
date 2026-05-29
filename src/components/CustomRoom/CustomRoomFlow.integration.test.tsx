@@ -4,6 +4,17 @@ import * as useCustomRoomHook from "../../hooks/useCustomRoom";
 import { BrowserRouter } from "react-router-dom";
 import { vi } from "vitest";
 
+vi.mock("../../contexts/AuthContext", () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
 describe("CustomRoomFlow - join room", () => {
   beforeEach(() => {
     localStorage.clear();
